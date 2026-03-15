@@ -233,38 +233,6 @@ html[data-theme="light"] .logo {
     gap: 0.25rem;
 }
 
-#breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    overflow: hidden;
-    font-size: inherit;
-    color: var(--color-text-secondary);
-    min-width: 0;
-    padding: 0 0.5rem;
-}
-
-#breadcrumb .crumb {
-    cursor: pointer;
-    color: var(--color-accent-blue);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 192px;
-}
-
-#breadcrumb .crumb:hover,
-#breadcrumb .crumb:focus-visible {
-    text-decoration: underline;
-    outline: none;
-    opacity: 0.8;
-}
-
-#breadcrumb .crumb-sep {
-    color: var(--color-text-tertiary);
-    flex-shrink: 0;
-}
-
 main {
     display: flex;
     flex: 1;
@@ -1208,7 +1176,19 @@ main {
         display: none;
     }
 
-    #breadcrumb {
-        padding: 0 0.15rem;
-    }
 }
+
+/* Resume prompt banner */
+#resume-prompt {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 1rem;
+    background: var(--accent-muted, #1f3a5f);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+    flex-shrink: 0;
+    color: #fff;
+}
+#resume-prompt span { flex: 1; }
+#resume-dismiss-btn { margin-left: calc(0.25rem - 0.75rem); }

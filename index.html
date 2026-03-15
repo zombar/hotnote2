@@ -58,7 +58,6 @@
             </button>
             <button class="btn" id="open-folder" title="Open a local folder">Open Folder</button>
         </div>
-        <div id="breadcrumb"></div>
         <div class="header-right">
             <label class="autosave-toggle" id="autosave-toggle-label" title="Automatically save changes after 2 seconds of inactivity">
                 <input type="checkbox" id="autosave-checkbox" aria-label="Autosave" />
@@ -72,6 +71,11 @@
             </button>
         </div>
     </header>
+    <div id="resume-prompt" style="display:none">
+        <span>Continue with <strong class="resume-folder-name"></strong>?</span>
+        <button class="btn btn-sm" id="resume-open-btn">Resume</button>
+        <button class="btn btn-sm btn-icon" id="resume-dismiss-btn" title="Dismiss" aria-label="Dismiss">×</button>
+    </div>
     <main>
         <aside id="sidebar">
             <div id="sidebar-toolbar">
