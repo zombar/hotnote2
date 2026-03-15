@@ -73,9 +73,86 @@ const state = {
     // Autosave
     autosaveEnabled: false,
     autosaveTimer: null,
+    // Relative path from root to current file (tracks subdirs opened via sidebar tree)
+    currentRelativePath: null,
+    currentLine: 1,
 };
 
 const dragState = { handle: null, parentHandle: null };
+
+// =========================================================================
+// URL State Management
+// =========================================================================
+
+function getRelativeFilePath() {
+    return state.currentRelativePath || null;
+}
+
+function updateURL() {
+    if (!state.rootHandle) return;
+    let qs = '?workdir=' + encodeURIComponent(state.rootHandle.name);
+    const filePath = getRelativeFilePath();
+    if (filePath) qs += '&file=' + filePath.split('/').map(encodeURIComponent).join('/');
+    if (state.currentLine > 1) qs += '&line=' + state.currentLine;
+    history.replaceState(null, '', qs);
+    localStorage.setItem('hotnote2-lastFolder', state.rootHandle.name);
+    if (filePath) localStorage.setItem('hotnote2-lastFile', filePath);
+    else localStorage.removeItem('hotnote2-lastFile');
+    if (state.currentLine > 1) localStorage.setItem('hotnote2-lastLine', state.currentLine);
+    else localStorage.removeItem('hotnote2-lastLine');
+}
+
+function clearURL() {
+    history.replaceState(null, '', window.location.pathname);
+}
+
+function scrollEditorToLine(lineNum) {
+    const editor = document.getElementById('source-editor');
+    if (!editor || lineNum <= 1) return;
+    const lines = editor.value.split('\n');
+    let pos = 0;
+    for (let i = 0; i < Math.min(lineNum - 1, lines.length); i++) {
+        pos += lines[i].length + 1;
+    }
+    editor.selectionStart = editor.selectionEnd = pos;
+    const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 20;
+    editor.scrollTop = Math.max(0, (lineNum - 1) * lineHeight - editor.clientHeight / 2);
+    state.currentLine = lineNum;
+}
+
+async function openFileByPath(rootHandle, relativePath, lineNum) {
+    try {
+        const parts = relativePath.split('/').filter(Boolean);
+        const filename = parts.pop();
+        let dir = rootHandle;
+        for (const part of parts) {
+            dir = await dir.getDirectoryHandle(part);
+        }
+        const fileHandle = await dir.getFileHandle(filename);
+        state.currentRelativePath = relativePath;
+        await openFile(fileHandle, filename);
+        if (lineNum && lineNum > 1) {
+            scrollEditorToLine(lineNum);
+            updateURL();
+        }
+    } catch (err) {
+        console.warn('Could not restore file from URL:', relativePath, err);
+    }
+}
+
+function showResumePrompt(folderName, filePath, lineNum) {
+    const banner = document.getElementById('resume-prompt');
+    if (!banner) return;
+    banner.querySelector('.resume-folder-name').textContent = folderName;
+    banner.dataset.file = filePath || '';
+    banner.dataset.line = lineNum && lineNum > 1 ? String(lineNum) : '';
+    banner.style.display = '';
+}
+
+function dismissResumePrompt() {
+    const banner = document.getElementById('resume-prompt');
+    if (banner) banner.style.display = 'none';
+}
 
 // =========================================================================
 // Utility
@@ -225,50 +302,14 @@ async function openFolder() {
         sidebarEl.classList.remove('collapsed');
         document.getElementById('resize-handle').style.display = '';
         await renderSidebar();
-        renderBreadcrumb();
+        updateURL();
+        dismissResumePrompt();
     } catch (err) {
         if (err.name !== 'AbortError') {
             console.error('Failed to open folder:', err);
         }
     }
 }
-
-// =========================================================================
-// Breadcrumb
-// =========================================================================
-
-function updateUpButton() {
-    const btn = document.getElementById('up-btn');
-    if (btn) btn.disabled = state.pathStack.length <= 1;
-}
-
-function renderBreadcrumb() {
-    const el = document.getElementById('breadcrumb');
-    if (!el) return;
-    if (!state.pathStack.length) {
-        el.innerHTML = '';
-        updateUpButton();
-        return;
-    }
-    el.innerHTML = state.pathStack.map((crumb, i) => {
-        const isLast = i === state.pathStack.length - 1;
-        return `<span class="crumb${isLast ? ' crumb-current' : ''}" data-idx="${i}" title="${escapeHtml(crumb.name)}"${!isLast ? ' role="button" tabindex="0"' : ''}>${escapeHtml(crumb.name)}</span>` +
-               (isLast ? '' : '<span class="crumb-sep">/</span>');
-    }).join('');
-    el.querySelectorAll('.crumb:not(.crumb-current)').forEach(el => {
-        const navigate = async () => {
-            const idx = parseInt(el.dataset.idx, 10);
-            state.pathStack = state.pathStack.slice(0, idx + 1);
-            state.currentDirHandle = state.pathStack[state.pathStack.length - 1].handle;
-            await renderSidebar();
-            renderBreadcrumb();
-        };
-        el.addEventListener('click', navigate);
-        el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(); } });
-    });
-    updateUpButton();
-}
-
 
 // =========================================================================
 // Sidebar / File Browser
@@ -293,8 +334,9 @@ async function renderSidebar() {
     }
 
     list.innerHTML = '';
+    const baseDirRelPath = state.pathStack.slice(1).map(p => p.name).join('/');
     for (const entry of entries) {
-        const li = renderFileEntry(entry, state.currentDirHandle);
+        const li = renderFileEntry(entry, state.currentDirHandle, baseDirRelPath);
         list.appendChild(li);
     }
 }
@@ -302,7 +344,8 @@ async function renderSidebar() {
 const CHEVRON_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
 const DELETE_SVG = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
-function renderFileEntry(entry, parentHandle) {
+function renderFileEntry(entry, parentHandle, dirRelPath) {
+    if (dirRelPath === undefined) dirRelPath = '';
     const li = document.createElement('li');
     li.className = 'file-entry';
     if (entry.kind === 'file' && entry.name === state.currentFilename) {
@@ -334,9 +377,10 @@ function renderFileEntry(entry, parentHandle) {
             ${deleteBtn}
         </div>`;
 
+        const folderRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
         li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
             if (e.target.closest('.delete-btn')) return;
-            await toggleFolder(li, entry.handle);
+            await toggleFolder(li, entry.handle, folderRelPath);
         });
 
         li.addEventListener('dragover', (e) => {
@@ -378,8 +422,10 @@ function renderFileEntry(entry, parentHandle) {
         </div>`;
 
         if (!unopenable) {
+            const fileRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
             li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
                 if (e.target.closest('.delete-btn')) return;
+                state.currentRelativePath = fileRelPath;
                 await openFile(entry.handle, entry.name);
             });
         }
@@ -408,7 +454,8 @@ function renderFileEntry(entry, parentHandle) {
     return li;
 }
 
-async function toggleFolder(li, handle) {
+async function toggleFolder(li, handle, dirRelPath) {
+    if (dirRelPath === undefined) dirRelPath = '';
     const isExpanded = li.classList.contains('expanded');
     if (isExpanded) {
         li.querySelector('.folder-children')?.remove();
@@ -435,7 +482,7 @@ async function toggleFolder(li, handle) {
         childUl.appendChild(emptyLi);
     } else {
         for (const child of entries) {
-            childUl.appendChild(renderFileEntry(child, handle));
+            childUl.appendChild(renderFileEntry(child, handle, dirRelPath));
         }
     }
     li.appendChild(childUl);
@@ -491,6 +538,8 @@ function showNewFileInput() {
             if (!name) { wrap.remove(); return; }
             wrap.remove();
             try {
+                const dirs = state.pathStack.slice(1).map(p => p.name);
+                state.currentRelativePath = dirs.length ? dirs.join('/') + '/' + name : name;
                 const handle = await createFile(name);
                 await renderSidebar();
                 await openFile(handle, name);
@@ -530,8 +579,22 @@ async function openFile(fileHandle, filename, pushHistory = true) {
     if (pushHistory) {
         const current = state.fileHistory[state.fileHistoryIndex];
         if (!current || current.handle !== fileHandle) {
+            // Save cursor/scroll of the file we're leaving
+            if (current) {
+                const sourceEditor = document.getElementById('source-editor');
+                const scrollEl = _scrollElForMode(state.editorMode);
+                current.pos = {
+                    editorMode: state.editorMode,
+                    cursorStart: sourceEditor?.selectionStart ?? 0,
+                    cursorEnd: sourceEditor?.selectionEnd ?? 0,
+                    scrollPositions: {
+                        ...state.scrollPositions,
+                        ...(scrollEl ? { [state.editorMode]: scrollEl.scrollTop } : {}),
+                    },
+                };
+            }
             state.fileHistory = state.fileHistory.slice(0, state.fileHistoryIndex + 1);
-            state.fileHistory.push({ handle: fileHandle, name: filename });
+            state.fileHistory.push({ handle: fileHandle, name: filename, relPath: state.currentRelativePath });
             state.fileHistoryIndex = state.fileHistory.length - 1;
         }
     }
@@ -539,6 +602,7 @@ async function openFile(fileHandle, filename, pushHistory = true) {
     state.currentFileHandle = fileHandle;
     state.currentFilename = filename;
     state.isDirty = false;
+    state.currentLine = 1;
     updateTitle();
 
     // Update sidebar active state
@@ -589,6 +653,7 @@ async function openFile(fileHandle, filename, pushHistory = true) {
         document.getElementById('sidebar')?.classList.add('collapsed');
     }
 
+    updateURL();
     updateNavButtons();
 }
 
@@ -624,7 +689,8 @@ async function navigateHistory(delta) {
     }
 
     state.fileHistoryIndex = target;
-    const { handle, name, pos } = state.fileHistory[target];
+    const { handle, name, pos, relPath } = state.fileHistory[target];
+    state.currentRelativePath = relPath || null;
     await openFile(handle, name, false);
 
     // Restore mode, cursor, and scroll for the target file
@@ -1690,6 +1756,56 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('resize-handle').style.display = 'none';
     clearEditor();
     updateTitle();
+
+    // URL-based folder/file restoration
+    const _urlParams = new URLSearchParams(window.location.search);
+    const _workdir = _urlParams.get('workdir');
+    const _file = _urlParams.get('file');
+    const _urlLine = parseInt(_urlParams.get('line') || '0', 10) || 0;
+    if (_workdir) {
+        showResumePrompt(_workdir, _file, _urlLine);
+    } else {
+        const _lastFolder = localStorage.getItem('hotnote2-lastFolder');
+        if (_lastFolder) {
+            const _lastLine = parseInt(localStorage.getItem('hotnote2-lastLine') || '0', 10) || 0;
+            showResumePrompt(_lastFolder, localStorage.getItem('hotnote2-lastFile'), _lastLine);
+        }
+    }
+
+    document.getElementById('resume-open-btn')?.addEventListener('click', async () => {
+        const banner = document.getElementById('resume-prompt');
+        const filePath = banner?.dataset.file || '';
+        const lineNum = parseInt(banner?.dataset.line || '0', 10) || 0;
+        dismissResumePrompt();
+        await openFolder();
+        if (filePath && state.rootHandle) {
+            await openFileByPath(state.rootHandle, filePath, lineNum);
+        }
+    });
+    document.getElementById('resume-dismiss-btn')?.addEventListener('click', () => {
+        dismissResumePrompt();
+        clearURL();
+        localStorage.removeItem('hotnote2-lastFolder');
+        localStorage.removeItem('hotnote2-lastFile');
+        localStorage.removeItem('hotnote2-lastLine');
+    });
+
+    // Track cursor line for URL/localStorage sync
+    let _lineDebounce = null;
+    document.getElementById('source-editor')?.addEventListener('keyup', () => {
+        const editor = document.getElementById('source-editor');
+        const pos = editor.selectionStart || 0;
+        state.currentLine = (editor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+        clearTimeout(_lineDebounce);
+        _lineDebounce = setTimeout(updateURL, 600);
+    });
+    document.getElementById('source-editor')?.addEventListener('mouseup', () => {
+        const editor = document.getElementById('source-editor');
+        const pos = editor.selectionStart || 0;
+        state.currentLine = (editor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+        clearTimeout(_lineDebounce);
+        _lineDebounce = setTimeout(updateURL, 600);
+    });
 
     // Autosave init
     state.autosaveEnabled = loadAutosavePref();
