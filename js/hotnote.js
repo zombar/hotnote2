@@ -24,6 +24,27 @@ const IMAGE_EXTENSIONS = new Set([
     'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif',
 ]);
 
+const BINARY_EXTENSIONS = new Set([
+    // Executables & compiled
+    'exe', 'dll', 'so', 'dylib', 'bin', 'out', 'class', 'pyc', 'pyo', 'pyd',
+    'o', 'a', 'lib', 'wasm', 'app',
+    // Archives
+    'zip', 'tar', 'gz', 'bz2', 'xz', '7z', 'rar', 'zst', 'lz4', 'lzma',
+    'pkg', 'deb', 'rpm', 'dmg', 'msi', 'apk', 'ipa',
+    // Documents (binary)
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
+    // Fonts
+    'ttf', 'otf', 'woff', 'woff2', 'eot',
+    // Audio
+    'mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac', 'opus', 'aiff',
+    // Video
+    'mp4', 'avi', 'mov', 'mkv', 'webm', 'm4v', 'wmv', 'flv',
+    // Database
+    'sqlite', 'sqlite3', 'db',
+]);
+
+const MAX_OPENABLE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 // =========================================================================
 // State
 // =========================================================================
@@ -78,6 +99,20 @@ function isImageFile(filename) {
     return IMAGE_EXTENSIONS.has(getExtension(filename));
 }
 
+function isUnopenable(entry) {
+    if (entry.kind !== 'file') return false;
+    if (IMAGE_EXTENSIONS.has(getExtension(entry.name))) return false; // images are viewable
+    if (BINARY_EXTENSIONS.has(getExtension(entry.name))) return true;
+    if (entry.size != null && entry.size > MAX_OPENABLE_SIZE) return true;
+    return false;
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 // =========================================================================
 // File System Helpers
 // =========================================================================
@@ -95,17 +130,25 @@ async function writeFile(fileHandle, content) {
 
 async function listDirectory(dirHandle) {
     const dirs = [];
-    const files = [];
+    const fileHandles = [];
     for await (const [name, handle] of dirHandle.entries()) {
         if (name.startsWith('.')) continue; // skip hidden
         if (handle.kind === 'directory') {
             dirs.push({ name, handle, kind: 'directory' });
         } else {
-            files.push({ name, handle, kind: 'file' });
+            fileHandles.push({ name, handle });
         }
     }
     dirs.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Fetch file sizes in parallel to determine openability
+    const files = await Promise.all(fileHandles.map(async ({ name, handle }) => {
+        let size = 0;
+        try { size = (await handle.getFile()).size; } catch (_) {}
+        return { name, handle, kind: 'file', size };
+    }));
     files.sort((a, b) => a.name.localeCompare(b.name));
+
     return [...dirs, ...files];
 }
 
@@ -249,17 +292,29 @@ function renderFileEntry(entry, parentHandle) {
             await toggleFolder(li, entry.handle);
         });
     } else {
-        li.innerHTML = `<div class="file-entry-row">
+        const unopenable = isUnopenable(entry);
+        if (unopenable) li.classList.add('disabled');
+
+        const reason = BINARY_EXTENSIONS.has(getExtension(entry.name))
+            ? 'Binary file'
+            : `Large file (${formatSize(entry.size)})`;
+        const tooltip = unopenable
+            ? `${escapeHtml(entry.name)} — ${reason}`
+            : escapeHtml(entry.name);
+
+        li.innerHTML = `<div class="file-entry-row" title="${tooltip}">
             <span class="toggle-spacer"></span>
             <span class="icon">${icon}</span>
-            <span class="name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+            <span class="name">${escapeHtml(entry.name)}</span>
             ${deleteBtn}
         </div>`;
 
-        li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
-            if (e.target.closest('.delete-btn')) return;
-            await openFile(entry.handle, entry.name);
-        });
+        if (!unopenable) {
+            li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
+                if (e.target.closest('.delete-btn')) return;
+                await openFile(entry.handle, entry.name);
+            });
+        }
     }
 
     li.querySelector('.delete-btn').addEventListener('click', async (e) => {

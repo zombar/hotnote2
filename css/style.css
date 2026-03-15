@@ -340,6 +340,15 @@ main {
     box-shadow: inset 2px 0 0 var(--color-text-primary);
 }
 
+.file-entry.disabled > .file-entry-row {
+    opacity: 0.38;
+    cursor: default;
+}
+.file-entry.disabled > .file-entry-row:hover {
+    background: none;
+    color: var(--color-text-secondary);
+}
+
 .file-entry-row .icon {
     flex-shrink: 0;
     display: flex;
