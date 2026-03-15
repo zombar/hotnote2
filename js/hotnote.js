@@ -67,6 +67,9 @@ const state = {
     treeviewCollapsed: new Set(),
     // Navigation: [{handle, name}]
     pathStack: [],
+    // File history for back/forward navigation
+    fileHistory: [],       // [{handle, name}, …]
+    fileHistoryIndex: -1,  // pointer into fileHistory; -1 = nothing open
     // Autosave
     autosaveEnabled: false,
     autosaveTimer: null,
@@ -519,9 +522,15 @@ async function showNewFolderInput() {
 // File Opening & Editor
 // =========================================================================
 
-async function openFile(fileHandle, filename) {
+async function openFile(fileHandle, filename, pushHistory = true) {
     if (state.isDirty) {
         if (!confirm('You have unsaved changes. Discard?')) return;
+    }
+
+    if (pushHistory) {
+        state.fileHistory = state.fileHistory.slice(0, state.fileHistoryIndex + 1);
+        state.fileHistory.push({ handle: fileHandle, name: filename });
+        state.fileHistoryIndex = state.fileHistory.length - 1;
     }
 
     state.currentFileHandle = fileHandle;
@@ -576,6 +585,27 @@ async function openFile(fileHandle, filename) {
     if (window.innerWidth <= 720) {
         document.getElementById('sidebar')?.classList.add('collapsed');
     }
+
+    updateNavButtons();
+}
+
+function updateNavButtons() {
+    const backBtn = document.getElementById('back-btn');
+    const fwdBtn = document.getElementById('forward-btn');
+    if (backBtn) backBtn.disabled = state.fileHistoryIndex <= 0;
+    if (fwdBtn)  fwdBtn.disabled = state.fileHistoryIndex >= state.fileHistory.length - 1;
+}
+
+async function navigateHistory(delta) {
+    const target = state.fileHistoryIndex + delta;
+    if (target < 0 || target >= state.fileHistory.length) return;
+    if (state.isDirty) {
+        if (!confirm('You have unsaved changes. Discard?')) return;
+        state.isDirty = false;
+    }
+    state.fileHistoryIndex = target;
+    const { handle, name } = state.fileHistory[target];
+    await openFile(handle, name, false);
 }
 
 function determineInitialMode(ext, content) {
@@ -1540,6 +1570,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Sidebar toolbar buttons
     document.getElementById('new-file-btn')?.addEventListener('click', showNewFileInput);
     document.getElementById('new-folder-btn')?.addEventListener('click', showNewFolderInput);
+    document.getElementById('back-btn')?.addEventListener('click', () => navigateHistory(-1));
+    document.getElementById('forward-btn')?.addEventListener('click', () => navigateHistory(1));
 
     // Textarea dirty tracking + highlight sync
     const sourceEditor = document.getElementById('source-editor');
