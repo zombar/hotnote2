@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HotNote2</title>
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Apply saved theme immediately to prevent flash
+        (function() {
+            var t = localStorage.getItem('hotnote2-theme') ||
+                (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
 </head>
 <body>
 <div id="app">
@@ -13,6 +21,7 @@
         <button class="btn" id="open-folder">Open Folder</button>
         <div id="breadcrumb"></div>
         <div class="spacer"></div>
+        <button class="btn btn-sm" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light theme">◑</button>
         <button class="btn btn-primary" id="save-btn" disabled>Save</button>
     </header>
     <main>

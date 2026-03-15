@@ -944,10 +944,39 @@ function closeNestedModal() {
 }
 
 // =========================================================================
+// Theme Toggle
+// =========================================================================
+
+function getSystemTheme() {
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('hotnote2-theme', theme);
+    const btn = document.getElementById('theme-toggle');
+    if (btn) btn.title = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+}
+
+function initTheme() {
+    const saved = localStorage.getItem('hotnote2-theme');
+    applyTheme(saved || getSystemTheme());
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || getSystemTheme();
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+// =========================================================================
 // Init
 // =========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Theme
+    initTheme();
+    document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+
     // Open folder button
     document.getElementById('open-folder')?.addEventListener('click', openFolder);
 
