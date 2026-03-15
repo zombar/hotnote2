@@ -20,6 +20,10 @@ const CODE_EXTENSIONS = new Set([
     'toml', 'sql', 'graphql', 'proto', 'tf', 'hcl', 'conf', 'ini', 'cfg',
 ]);
 
+const IMAGE_EXTENSIONS = new Set([
+    'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif',
+]);
+
 // =========================================================================
 // State
 // =========================================================================
@@ -30,7 +34,9 @@ const state = {
     currentFileHandle: null,
     currentFilename: '',
     isDirty: false,
-    editorMode: 'source', // 'source' | 'wysiwyg' | 'highlight' | 'datasheet' | 'treeview'
+    editorMode: 'source', // 'source' | 'wysiwyg' | 'highlight' | 'datasheet' | 'treeview' | 'image'
+    imageObjectUrl: null,
+    scrollPositions: {},
     // JSON view state
     datasheetData: null,
     datasheetSchema: null,
@@ -66,6 +72,10 @@ function isTextFile(filename) {
     const ext = getExtension(filename);
     const name = filename.toLowerCase();
     return TEXT_EXTENSIONS.has(ext) || name === 'dockerfile' || name === 'makefile' || name.startsWith('.');
+}
+
+function isImageFile(filename) {
+    return IMAGE_EXTENSIONS.has(getExtension(filename));
 }
 
 // =========================================================================
@@ -355,12 +365,27 @@ async function openFile(fileHandle, filename) {
         li.classList.toggle('active', li.querySelector('.name')?.textContent === filename);
     });
 
+    // Reset scroll positions for new file
+    state.scrollPositions = {};
+
     let content = '';
     if (isTextFile(filename)) {
         try {
             content = await readFile(fileHandle);
         } catch (err) {
             alert(`Failed to read file: ${err.message}`);
+            return;
+        }
+    } else if (isImageFile(filename)) {
+        if (state.imageObjectUrl) {
+            URL.revokeObjectURL(state.imageObjectUrl);
+            state.imageObjectUrl = null;
+        }
+        try {
+            const file = await fileHandle.getFile();
+            state.imageObjectUrl = URL.createObjectURL(file);
+        } catch (err) {
+            alert(`Failed to read image: ${err.message}`);
             return;
         }
     }
@@ -380,6 +405,12 @@ async function openFile(fileHandle, filename) {
 }
 
 function determineInitialMode(ext, content) {
+    // Image files
+    if (IMAGE_EXTENSIONS.has(ext)) {
+        state.editorMode = 'image';
+        return;
+    }
+
     // JSON: treeview if valid, else source
     if (ext === 'json') {
         const jt = detectJsonType(content);
@@ -420,6 +451,7 @@ function renderEditor(content, filename) {
 
 function updateModeToolbar() {
     const ext = getExtension(state.currentFilename);
+    const isImage = IMAGE_EXTENSIONS.has(ext);
     const isJson = ext === 'json';
     const isMd = ext === 'md';
 
@@ -427,6 +459,12 @@ function updateModeToolbar() {
     const hasTree = isJson && (jt.isObject || jt.isArray);
 
     const modeToolbar = document.getElementById('mode-toolbar');
+
+    if (isImage) {
+        modeToolbar.innerHTML = `<span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>`;
+        return;
+    }
+
     modeToolbar.innerHTML = `
         <button class="btn btn-sm${state.editorMode === 'source' ? ' active' : ''}" id="mode-source">Source</button>
         ${isMd ? `<button class="btn btn-sm${state.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg">Preview</button>` : ''}
@@ -716,7 +754,19 @@ function updateSourceHighlight() {
     }
 }
 
+function _scrollElForMode(mode) {
+    if (mode === 'source') return document.getElementById('source-editor');
+    if (mode === 'wysiwyg') return document.getElementById('wysiwyg');
+    if (mode === 'treeview') return document.getElementById('s3-treeview');
+    if (mode === 'image') return document.getElementById('image-viewer');
+    return null;
+}
+
 function switchToMode(mode, content) {
+    // Save scroll position of current panel before switching
+    const prevEl = _scrollElForMode(state.editorMode);
+    if (prevEl) state.scrollPositions[state.editorMode] = prevEl.scrollTop;
+
     state.editorMode = mode;
 
     const wrap = document.getElementById('source-editor-wrap');
@@ -724,12 +774,14 @@ function switchToMode(mode, content) {
     const wysiwyg = document.getElementById('wysiwyg');
     const datasheet = document.getElementById('s3-datasheet');
     const treeview = document.getElementById('s3-treeview');
+    const imageViewer = document.getElementById('image-viewer');
 
     // Hide all panels
     wrap.style.display = 'none';
     wysiwyg.style.display = 'none';
     datasheet.style.display = 'none';
     treeview.style.display = 'none';
+    imageViewer.style.display = 'none';
 
     const currentContent = content !== undefined ? content : textarea.value;
 
@@ -762,7 +814,18 @@ function switchToMode(mode, content) {
             break;
         }
 
+        case 'image':
+            imageViewer.style.display = 'flex';
+            imageViewer.innerHTML = state.imageObjectUrl
+                ? `<img src="${state.imageObjectUrl}" alt="${escapeHtml(state.currentFilename)}">`
+                : `<p style="color:var(--color-text-tertiary)">Failed to load image</p>`;
+            break;
+
     }
+
+    // Restore scroll position for this mode (0 = top if not previously saved)
+    const newEl = _scrollElForMode(mode);
+    if (newEl) newEl.scrollTop = state.scrollPositions[mode] || 0;
 
     // Update toolbar buttons
     document.querySelectorAll('#mode-toolbar .btn').forEach(btn => {

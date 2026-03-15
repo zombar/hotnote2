@@ -549,6 +549,24 @@ main {
     display: none;
 }
 
+/* Image viewer */
+#image-viewer {
+    flex: 1;
+    overflow: auto;
+    background: var(--color-bg-primary);
+    display: none;
+    justify-content: center;
+    padding: 2rem;
+}
+
+#image-viewer img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid var(--color-border-primary);
+    box-shadow: var(--shadow-md);
+}
+
 /* =====================================================================
    Buttons
    ===================================================================== */
@@ -788,12 +806,12 @@ main {
 .s3-wysiwyg hr { border: none; border-top: 2px solid var(--color-border-primary); margin: 1.5em 0; height: 1px; }
 .s3-wysiwyg p { margin: 0.8em 0; line-height: 1.75; }
 .s3-wysiwyg p img {
-    max-height: 24px;
-    width: auto;
+    display: block;
+    width: 100%;
+    height: auto;
     max-width: 100%;
-    vertical-align: middle;
-    margin: 0 0.125rem;
-    border: none;
+    margin: 0.75em 0;
+    border: 1px solid var(--color-border-primary);
 }
 
 .img-placeholder {
@@ -944,9 +962,9 @@ main {
 }
 .tree-toggle:hover { color: var(--color-text-primary); }
 
-.tree-key { color: var(--color-text-primary); margin-right: 0.25rem; }
-.tree-bracket { color: var(--color-text-secondary); margin: 0 0.25rem; }
-.tree-count { color: var(--color-text-secondary); font-style: italic; font-size: 0.55rem; }
+.tree-key { color: var(--tok-string); margin-right: 0.25rem; }
+.tree-bracket { color: var(--tok-operator); margin: 0 0.25rem; }
+.tree-count { color: var(--color-text-tertiary); font-style: italic; font-size: 0.55rem; }
 
 .tree-children {
     margin-left: 1.5rem;
@@ -954,11 +972,11 @@ main {
     padding-left: 0.5rem;
 }
 
-.tree-string { color: var(--color-accent-green); }
-.tree-number { color: var(--color-accent-blue); }
-.tree-boolean { color: var(--color-accent-orange); }
-.tree-null { color: var(--color-text-secondary); font-style: italic; }
-.tree-undefined { color: var(--color-text-secondary); font-style: italic; }
+.tree-string { color: var(--tok-string); }
+.tree-number { color: var(--tok-number); }
+.tree-boolean { color: var(--tok-keyword); }
+.tree-null { color: var(--tok-comment); font-style: italic; }
+.tree-undefined { color: var(--tok-comment); font-style: italic; }
 .tree-unknown { color: var(--color-accent-red); }
 
 .tree-datasheet-link {
