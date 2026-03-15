@@ -127,7 +127,9 @@ async function openFolder() {
         state.currentFileHandle = null;
         state.currentFilename = '';
         clearEditor();
-        document.getElementById('sidebar').style.display = '';
+        const sidebarEl = document.getElementById('sidebar');
+        sidebarEl.style.display = '';
+        sidebarEl.classList.remove('collapsed');
         document.getElementById('resize-handle').style.display = '';
         await renderSidebar();
         renderBreadcrumb();
@@ -147,22 +149,39 @@ function renderBreadcrumb() {
     if (!el) return;
     if (!state.pathStack.length) {
         el.innerHTML = '';
+        updateUpButton();
         return;
     }
     el.innerHTML = state.pathStack.map((crumb, i) => {
         const isLast = i === state.pathStack.length - 1;
-        return `<span class="crumb${isLast ? ' crumb-current' : ''}" data-idx="${i}">${escapeHtml(crumb.name)}</span>` +
+        return `<span class="crumb${isLast ? ' crumb-current' : ''}" data-idx="${i}" title="${escapeHtml(crumb.name)}"${!isLast ? ' role="button" tabindex="0"' : ''}>${escapeHtml(crumb.name)}</span>` +
                (isLast ? '' : '<span class="crumb-sep">/</span>');
     }).join('');
     el.querySelectorAll('.crumb:not(.crumb-current)').forEach(el => {
-        el.addEventListener('click', async () => {
+        const navigate = async () => {
             const idx = parseInt(el.dataset.idx, 10);
             state.pathStack = state.pathStack.slice(0, idx + 1);
             state.currentDirHandle = state.pathStack[state.pathStack.length - 1].handle;
             await renderSidebar();
             renderBreadcrumb();
-        });
+        };
+        el.addEventListener('click', navigate);
+        el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(); } });
     });
+    updateUpButton();
+}
+
+function updateUpButton() {
+    const btn = document.getElementById('up-btn');
+    if (btn) btn.disabled = state.pathStack.length <= 1;
+}
+
+async function navigateUp() {
+    if (state.pathStack.length <= 1) return;
+    state.pathStack.pop();
+    state.currentDirHandle = state.pathStack[state.pathStack.length - 1].handle;
+    await renderSidebar();
+    renderBreadcrumb();
 }
 
 // =========================================================================
@@ -205,7 +224,7 @@ function renderFileEntry(entry) {
     li.innerHTML = `
         <span class="icon">${icon}</span>
         <span class="name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
-        <button class="delete-btn" title="Delete">✕</button>
+        <button class="delete-btn" title="Delete ${escapeHtml(entry.name)}" aria-label="Delete ${escapeHtml(entry.name)}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     `;
 
     // Click handler
@@ -361,36 +380,16 @@ async function openFile(fileHandle, filename) {
 }
 
 function determineInitialMode(ext, content) {
-    // JSON handling
+    // JSON: treeview if valid, else source
     if (ext === 'json') {
-        const ds = detectDatasheetMode(content);
-        if (ds.isDatasheet) {
-            state.editorMode = 'datasheet';
-            state.datasheetData = ds.data;
-            state.datasheetSchema = inferSchema(ds.data);
-            state.datasheetPage = 1;
+        const jt = detectJsonType(content);
+        if (jt.isObject || jt.isArray) {
+            state.editorMode = 'treeview';
+            state.treeviewData = jt.parsed;
+            state.treeviewCollapsed = new Set();
         } else {
-            const jt = detectJsonType(content);
-            if (jt.isObject || jt.isArray) {
-                state.editorMode = 'treeview';
-                state.treeviewData = jt.parsed;
-                state.treeviewCollapsed = new Set();
-            } else {
-                state.editorMode = 'source';
-            }
+            state.editorMode = 'source';
         }
-        return;
-    }
-
-    // Markdown handling
-    if (shouldUseWysiwygMode(ext, content)) {
-        state.editorMode = 'wysiwyg';
-        return;
-    }
-
-    // Code file handling — default to highlighted view
-    if (CODE_EXTENSIONS.has(ext)) {
-        state.editorMode = 'highlight';
         return;
     }
 
@@ -423,25 +422,20 @@ function updateModeToolbar() {
     const ext = getExtension(state.currentFilename);
     const isJson = ext === 'json';
     const isMd = ext === 'md';
-    const isCode = CODE_EXTENSIONS.has(ext);
 
-    const ds = isJson ? detectDatasheetMode(document.getElementById('source-editor').value) : { isDatasheet: false };
     const jt = isJson ? detectJsonType(document.getElementById('source-editor').value) : { isObject: false, isArray: false };
+    const hasTree = isJson && (jt.isObject || jt.isArray);
 
     const modeToolbar = document.getElementById('mode-toolbar');
     modeToolbar.innerHTML = `
         <button class="btn btn-sm${state.editorMode === 'source' ? ' active' : ''}" id="mode-source">Source</button>
         ${isMd ? `<button class="btn btn-sm${state.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg">Preview</button>` : ''}
-        ${(isCode || isJson) ? `<button class="btn btn-sm${state.editorMode === 'highlight' ? ' active' : ''}" id="mode-highlight">View</button>` : ''}
-        ${(isJson && ds.isDatasheet) ? `<button class="btn btn-sm${state.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet">Datasheet</button>` : ''}
-        ${(isJson && (jt.isObject || jt.isArray)) ? `<button class="btn btn-sm${state.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview">Tree</button>` : ''}
+        ${hasTree ? `<button class="btn btn-sm${state.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview">Tree</button>` : ''}
         <span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>
     `;
 
     document.getElementById('mode-source')?.addEventListener('click', () => switchToMode('source'));
     document.getElementById('mode-wysiwyg')?.addEventListener('click', () => switchToMode('wysiwyg'));
-    document.getElementById('mode-highlight')?.addEventListener('click', () => switchToMode('highlight'));
-    document.getElementById('mode-datasheet')?.addEventListener('click', () => switchToMode('datasheet'));
     document.getElementById('mode-treeview')?.addEventListener('click', () => switchToMode('treeview'));
 }
 
@@ -575,6 +569,30 @@ function getHighlightRules(lang) {
                 { regex: /\b(true|false|null|yes|no|on|off)\b/y, type: 'keyword' },
                 num, op,
             ];
+        case 'md': case 'markdown':
+            return [
+                // Fenced code blocks
+                { regex: /```[\s\S]*?```/y, type: 'comment' },
+                // Inline code
+                str(/`[^`\n]+`/y),
+                // Headers
+                { regex: /^#{1,6} [^\n]*/my, type: 'keyword' },
+                // Blockquotes
+                { regex: /^> [^\n]*/my, type: 'comment' },
+                // Bold
+                { regex: /\*\*[^*\n]+\*\*/y, type: 'type' },
+                { regex: /__[^_\n]+__/y, type: 'type' },
+                // Italic
+                { regex: /\*[^*\n]+\*/y, type: 'string' },
+                { regex: /_[^_\n]+_/y, type: 'string' },
+                // Links and images
+                { regex: /!?\[[^\]\n]*\]\([^)\n]*\)/y, type: 'builtin' },
+                // List markers
+                { regex: /^[-*+] /my, type: 'operator' },
+                { regex: /^\d+\. /my, type: 'number' },
+                // Horizontal rules
+                { regex: /^[-*]{3,}$/my, type: 'operator' },
+            ];
         default:
             return [
                 comment(/\/\/[^\n]*/y),
@@ -680,16 +698,35 @@ function animateAutosaveLabel() {
     }, 1500);
 }
 
+function updateSourceHighlight() {
+    const codeEl = document.getElementById('source-highlight-code');
+    if (!codeEl) return;
+    const textarea = document.getElementById('source-editor');
+    const content = textarea.value;
+    const lang = getExtension(state.currentFilename);
+
+    // Trailing newline prevents last-line clipping
+    codeEl.innerHTML = highlightCode(content + '\n', lang);
+
+    // Update line numbers
+    const lineNumEl = document.getElementById('line-numbers');
+    if (lineNumEl) {
+        const lineCount = (content.match(/\n/g) || []).length + 1;
+        lineNumEl.textContent = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
+    }
+}
+
 function switchToMode(mode, content) {
     state.editorMode = mode;
 
+    const wrap = document.getElementById('source-editor-wrap');
     const textarea = document.getElementById('source-editor');
     const wysiwyg = document.getElementById('wysiwyg');
     const datasheet = document.getElementById('s3-datasheet');
     const treeview = document.getElementById('s3-treeview');
 
     // Hide all panels
-    textarea.style.display = 'none';
+    wrap.style.display = 'none';
     wysiwyg.style.display = 'none';
     datasheet.style.display = 'none';
     treeview.style.display = 'none';
@@ -698,7 +735,8 @@ function switchToMode(mode, content) {
 
     switch (mode) {
         case 'source':
-            textarea.style.display = 'block';
+            wrap.style.display = 'block';
+            updateSourceHighlight();
             textarea.focus();
             break;
 
@@ -715,16 +753,6 @@ function switchToMode(mode, content) {
             applySyntaxHighlighting(wysiwyg);
             break;
 
-        case 'datasheet': {
-            const parsed = JSON.parse(currentContent);
-            state.datasheetData = parsed;
-            state.datasheetSchema = inferSchema(parsed);
-            state.datasheetPage = 1;
-            datasheet.style.display = 'flex';
-            renderDatasheet();
-            break;
-        }
-
         case 'treeview': {
             const jt = detectJsonType(currentContent);
             state.treeviewData = jt.parsed;
@@ -734,14 +762,6 @@ function switchToMode(mode, content) {
             break;
         }
 
-        case 'highlight': {
-            const lang = getExtension(state.currentFilename);
-            wysiwyg.style.display = 'block';
-            wysiwyg.className = 'code-highlight-view';
-            wysiwyg.contentEditable = 'false';
-            wysiwyg.innerHTML = `<pre class="code-highlight-pre"><code>${highlightCode(currentContent, lang)}</code></pre>`;
-            break;
-        }
     }
 
     // Update toolbar buttons
@@ -758,13 +778,14 @@ function clearEditor() {
     state.editorMode = 'source';
     updateTitle();
 
+    const wrap = document.getElementById('source-editor-wrap');
     const textarea = document.getElementById('source-editor');
     const wysiwyg = document.getElementById('wysiwyg');
     const datasheet = document.getElementById('s3-datasheet');
     const treeview = document.getElementById('s3-treeview');
     const toolbar = document.getElementById('mode-toolbar');
 
-    textarea.style.display = 'none';
+    wrap.style.display = 'none';
     textarea.value = '';
     wysiwyg.style.display = 'none';
     datasheet.style.display = 'none';
@@ -827,6 +848,11 @@ function updateTitle() {
 // Sidebar Resize
 // =========================================================================
 
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.toggle('collapsed');
+}
+
 function initResizeHandle() {
     const handle = document.getElementById('resize-handle');
     const sidebar = document.getElementById('sidebar');
@@ -845,7 +871,7 @@ function initResizeHandle() {
 
     document.addEventListener('mousemove', (e) => {
         if (!handle.classList.contains('dragging')) return;
-        const newWidth = Math.max(120, Math.min(600, startWidth + (e.clientX - startX)));
+        const newWidth = Math.max(144, Math.min(720, startWidth + (e.clientX - startX)));
         sidebar.style.width = `${newWidth}px`;
     });
 
@@ -1086,22 +1112,6 @@ function renderTreeView() {
         });
     });
 
-    // Attach datasheet link handlers
-    container.querySelectorAll('.tree-datasheet-link').forEach(el => {
-        el.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Navigate data path to get the array
-            const path = el.dataset.treePath;
-            const arr = getValueAtPath(state.treeviewData, path);
-            if (arr) {
-                state.datasheetData = arr;
-                state.datasheetSchema = inferSchema(arr);
-                state.datasheetPage = 1;
-                switchToMode('datasheet');
-                updateModeToolbar();
-            }
-        });
-    });
 }
 
 function getValueAtPath(root, path) {
@@ -1144,17 +1154,12 @@ function renderTreeNode(value, path, key) {
 
     if (Array.isArray(value)) {
         const toggleIcon = isCollapsed ? '▶' : '▼';
-        const canShowDatasheet = value.length > 0 &&
-            value.every((item) => typeof item === 'object' && item !== null && !Array.isArray(item));
 
         let html = `<div class="tree-item tree-expandable">
             <span class="tree-toggle" data-tree-path="${escapeHtml(fullPath)}">${toggleIcon}</span>
             <span class="tree-key">${escapeHtml(String(key))}:</span>
             <span class="tree-bracket">[</span><span class="tree-count">${value.length} items</span><span class="tree-bracket">]</span>`;
 
-        if (canShowDatasheet) {
-            html += ` <a href="#" class="tree-datasheet-link" data-tree-path="${escapeHtml(fullPath)}">(datasheet)</a>`;
-        }
         html += '</div>';
 
         if (!isCollapsed) {
@@ -1285,11 +1290,29 @@ document.addEventListener('DOMContentLoaded', () => {
     saveBtn?.addEventListener('click', saveFile);
 
     // Sidebar toolbar buttons
+    document.getElementById('up-btn')?.addEventListener('click', navigateUp);
     document.getElementById('new-file-btn')?.addEventListener('click', showNewFileInput);
     document.getElementById('new-folder-btn')?.addEventListener('click', showNewFolderInput);
 
-    // Textarea dirty tracking
-    document.getElementById('source-editor')?.addEventListener('input', setDirty);
+    // Textarea dirty tracking + highlight sync
+    const sourceEditor = document.getElementById('source-editor');
+    sourceEditor?.addEventListener('input', () => {
+        setDirty();
+        updateSourceHighlight();
+    });
+
+    // Scroll sync: keep highlight backdrop and line numbers aligned with textarea
+    sourceEditor?.addEventListener('scroll', () => {
+        const backdrop = document.getElementById('source-highlight-backdrop');
+        const lineNums = document.getElementById('line-numbers');
+        if (backdrop) {
+            backdrop.scrollTop = sourceEditor.scrollTop;
+            backdrop.scrollLeft = sourceEditor.scrollLeft;
+        }
+        if (lineNums) {
+            lineNums.scrollTop = sourceEditor.scrollTop;
+        }
+    });
 
     // Ctrl+S / Cmd+S save
     document.addEventListener('keydown', (e) => {
@@ -1301,6 +1324,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Resize handle
     initResizeHandle();
+
+    // Sidebar toggle
+    document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
+
+    // Auto-collapse sidebar on narrow viewports
+    const autoCollapseMQ = window.matchMedia('(max-width: 720px)');
+    function handleAutoCollapse(mq) {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+        if (mq.matches) {
+            sidebar.classList.add('collapsed');
+        }
+    }
+    autoCollapseMQ.addEventListener('change', handleAutoCollapse);
+    handleAutoCollapse(autoCollapseMQ);
 
     // Nested modal close
     document.getElementById('nested-modal-close')?.addEventListener('click', closeNestedModal);

@@ -31,6 +31,8 @@ html[data-theme="dark"] {
     --tok-comment: #666666;    /* mid gray */
     --tok-builtin: #58cce0;
     --tok-operator: #b098e8;
+    --color-bg-navbar:  #252525;  /* lighter than secondary — header elevation */
+    --color-bg-toolbar: #111111;  /* darker than secondary — sub-toolbar recess */
     --shadow-sm:        0 1px 3px rgba(0,0,0,0.30), 0 1px 1px rgba(0,0,0,0.18);
     --shadow-md:        0 2px 8px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.20);
     --shadow-lg:        0 12px 40px rgba(0,0,0,0.55), 0 4px 14px rgba(0,0,0,0.30);
@@ -65,6 +67,8 @@ html[data-theme="light"] {
     --tok-comment: #909090;    /* mid gray */
     --tok-builtin: #0a5a78;
     --tok-operator: #3a1888;
+    --color-bg-navbar:  #f9f9f9;  /* lighter than secondary — header elevation */
+    --color-bg-toolbar: #e6e6e6;  /* darker than secondary — sub-toolbar recess */
     --shadow-sm:        0 1px 3px rgba(0,0,0,0.10), 0 1px 1px rgba(0,0,0,0.06);
     --shadow-md:        0 2px 8px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.07);
     --shadow-lg:        0 12px 40px rgba(0,0,0,0.20), 0 4px 14px rgba(0,0,0,0.10);
@@ -94,6 +98,8 @@ html[data-theme="light"] {
         --tok-comment: #909090;
         --tok-builtin: #0a5a78;
         --tok-operator: #3a1888;
+        --color-bg-navbar:  #f9f9f9;
+        --color-bg-toolbar: #e6e6e6;
         --shadow-sm:        0 1px 3px rgba(0,0,0,0.10), 0 1px 1px rgba(0,0,0,0.06);
         --shadow-md:        0 2px 8px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.07);
         --shadow-lg:        0 12px 40px rgba(0,0,0,0.20), 0 4px 14px rgba(0,0,0,0.10);
@@ -153,7 +159,7 @@ header {
     gap: 0.75rem;
     height: var(--header-height);
     padding: 0 1rem;
-    background: var(--color-bg-secondary);
+    background: var(--color-bg-navbar);
     border-bottom: 1px solid var(--color-border-primary);
     box-shadow: var(--shadow-md);
     flex-shrink: 0;
@@ -248,6 +254,7 @@ main {
     align-items: center;
     gap: 0.25rem;
     padding: 0.375rem 0.625rem;
+    background: var(--color-bg-toolbar);
     border-bottom: 1px solid var(--color-border-primary);
     flex-shrink: 0;
 }
@@ -385,7 +392,7 @@ main {
     align-items: center;
     gap: 0.25rem;
     padding: 0.375rem 0.75rem;
-    background: var(--color-bg-secondary);
+    background: var(--color-bg-toolbar);
     border-bottom: 1px solid var(--color-border-primary);
     box-shadow: 0 1px 0 var(--color-border-primary), 0 2px 6px rgba(0,0,0,0.20);
     flex-shrink: 0;
@@ -588,6 +595,14 @@ main {
     border-color: var(--color-text-primary);
     color: var(--color-bg-primary);
     box-shadow: none;
+}
+
+/* Mode toolbar buttons — normal button style when active, bottom-edge accent only */
+#mode-toolbar .btn.active {
+    background: var(--color-bg-tertiary);
+    border-color: var(--color-border-primary);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-sm), var(--highlight-top), inset 0 -2px 0 var(--color-text-primary);
 }
 
 .btn-primary {
