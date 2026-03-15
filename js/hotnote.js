@@ -14,6 +14,16 @@ const TEXT_EXTENSIONS = new Set([
     'graphql', 'proto', 'tf', 'hcl', 'log', 'csv',
 ]);
 
+const CODE_EXTENSIONS = new Set([
+    'js', 'ts', 'jsx', 'tsx', 'go', 'py', 'rb', 'rs', 'css', 'scss',
+    'html', 'htm', 'xml', 'sh', 'bash', 'zsh', 'yaml', 'yml',
+    'toml', 'sql', 'graphql', 'proto', 'tf', 'hcl', 'conf', 'ini', 'cfg',
+]);
+
+const IMAGE_EXTENSIONS = new Set([
+    'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif',
+]);
+
 // =========================================================================
 // State
 // =========================================================================
@@ -24,7 +34,9 @@ const state = {
     currentFileHandle: null,
     currentFilename: '',
     isDirty: false,
-    editorMode: 'source', // 'source' | 'wysiwyg' | 'datasheet' | 'treeview'
+    editorMode: 'source', // 'source' | 'wysiwyg' | 'highlight' | 'datasheet' | 'treeview' | 'image'
+    imageObjectUrl: null,
+    scrollPositions: {},
     // JSON view state
     datasheetData: null,
     datasheetSchema: null,
@@ -34,6 +46,9 @@ const state = {
     treeviewCollapsed: new Set(),
     // Navigation: [{handle, name}]
     pathStack: [],
+    // Autosave
+    autosaveEnabled: false,
+    autosaveTimer: null,
 };
 
 // =========================================================================
@@ -57,6 +72,10 @@ function isTextFile(filename) {
     const ext = getExtension(filename);
     const name = filename.toLowerCase();
     return TEXT_EXTENSIONS.has(ext) || name === 'dockerfile' || name === 'makefile' || name.startsWith('.');
+}
+
+function isImageFile(filename) {
+    return IMAGE_EXTENSIONS.has(getExtension(filename));
 }
 
 // =========================================================================
@@ -118,7 +137,9 @@ async function openFolder() {
         state.currentFileHandle = null;
         state.currentFilename = '';
         clearEditor();
-        document.getElementById('sidebar').style.display = '';
+        const sidebarEl = document.getElementById('sidebar');
+        sidebarEl.style.display = '';
+        sidebarEl.classList.remove('collapsed');
         document.getElementById('resize-handle').style.display = '';
         await renderSidebar();
         renderBreadcrumb();
@@ -138,22 +159,39 @@ function renderBreadcrumb() {
     if (!el) return;
     if (!state.pathStack.length) {
         el.innerHTML = '';
+        updateUpButton();
         return;
     }
     el.innerHTML = state.pathStack.map((crumb, i) => {
         const isLast = i === state.pathStack.length - 1;
-        return `<span class="crumb${isLast ? ' crumb-current' : ''}" data-idx="${i}">${escapeHtml(crumb.name)}</span>` +
+        return `<span class="crumb${isLast ? ' crumb-current' : ''}" data-idx="${i}" title="${escapeHtml(crumb.name)}"${!isLast ? ' role="button" tabindex="0"' : ''}>${escapeHtml(crumb.name)}</span>` +
                (isLast ? '' : '<span class="crumb-sep">/</span>');
     }).join('');
     el.querySelectorAll('.crumb:not(.crumb-current)').forEach(el => {
-        el.addEventListener('click', async () => {
+        const navigate = async () => {
             const idx = parseInt(el.dataset.idx, 10);
             state.pathStack = state.pathStack.slice(0, idx + 1);
             state.currentDirHandle = state.pathStack[state.pathStack.length - 1].handle;
             await renderSidebar();
             renderBreadcrumb();
-        });
+        };
+        el.addEventListener('click', navigate);
+        el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(); } });
     });
+    updateUpButton();
+}
+
+function updateUpButton() {
+    const btn = document.getElementById('up-btn');
+    if (btn) btn.disabled = state.pathStack.length <= 1;
+}
+
+async function navigateUp() {
+    if (state.pathStack.length <= 1) return;
+    state.pathStack.pop();
+    state.currentDirHandle = state.pathStack[state.pathStack.length - 1].handle;
+    await renderSidebar();
+    renderBreadcrumb();
 }
 
 // =========================================================================
@@ -196,7 +234,7 @@ function renderFileEntry(entry) {
     li.innerHTML = `
         <span class="icon">${icon}</span>
         <span class="name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
-        <button class="delete-btn" title="Delete">✕</button>
+        <button class="delete-btn" title="Delete ${escapeHtml(entry.name)}" aria-label="Delete ${escapeHtml(entry.name)}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     `;
 
     // Click handler
@@ -327,6 +365,9 @@ async function openFile(fileHandle, filename) {
         li.classList.toggle('active', li.querySelector('.name')?.textContent === filename);
     });
 
+    // Reset scroll positions for new file
+    state.scrollPositions = {};
+
     let content = '';
     if (isTextFile(filename)) {
         try {
@@ -335,41 +376,55 @@ async function openFile(fileHandle, filename) {
             alert(`Failed to read file: ${err.message}`);
             return;
         }
+    } else if (isImageFile(filename)) {
+        if (state.imageObjectUrl) {
+            URL.revokeObjectURL(state.imageObjectUrl);
+            state.imageObjectUrl = null;
+        }
+        try {
+            const file = await fileHandle.getFile();
+            state.imageObjectUrl = URL.createObjectURL(file);
+        } catch (err) {
+            alert(`Failed to read image: ${err.message}`);
+            return;
+        }
     }
 
     const ext = getExtension(filename);
     determineInitialMode(ext, content);
     renderEditor(content, filename);
+
+    // Enable autosave controls
+    const autosaveCheckbox = document.getElementById('autosave-checkbox');
+    const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
+    if (autosaveCheckbox) {
+        autosaveCheckbox.disabled = false;
+        autosaveCheckbox.checked = state.autosaveEnabled;
+    }
+    if (autosaveToggleLabel) autosaveToggleLabel.style.opacity = '';
 }
 
 function determineInitialMode(ext, content) {
-    // JSON handling
+    // Image files
+    if (IMAGE_EXTENSIONS.has(ext)) {
+        state.editorMode = 'image';
+        return;
+    }
+
+    // JSON: treeview if valid, else source
     if (ext === 'json') {
-        const ds = detectDatasheetMode(content);
-        if (ds.isDatasheet) {
-            state.editorMode = 'datasheet';
-            state.datasheetData = ds.data;
-            state.datasheetSchema = inferSchema(ds.data);
-            state.datasheetPage = 1;
+        const jt = detectJsonType(content);
+        if (jt.isObject || jt.isArray) {
+            state.editorMode = 'treeview';
+            state.treeviewData = jt.parsed;
+            state.treeviewCollapsed = new Set();
         } else {
-            const jt = detectJsonType(content);
-            if (jt.isObject || jt.isArray) {
-                state.editorMode = 'treeview';
-                state.treeviewData = jt.parsed;
-                state.treeviewCollapsed = new Set();
-            } else {
-                state.editorMode = 'source';
-            }
+            state.editorMode = 'source';
         }
         return;
     }
 
-    // Markdown handling
-    if (shouldUseWysiwygMode(ext, content)) {
-        state.editorMode = 'wysiwyg';
-    } else {
-        state.editorMode = 'source';
-    }
+    state.editorMode = 'source';
 }
 
 function renderEditor(content, filename) {
@@ -396,24 +451,29 @@ function renderEditor(content, filename) {
 
 function updateModeToolbar() {
     const ext = getExtension(state.currentFilename);
+    const isImage = IMAGE_EXTENSIONS.has(ext);
     const isJson = ext === 'json';
     const isMd = ext === 'md';
 
-    const ds = isJson ? detectDatasheetMode(document.getElementById('source-editor').value) : { isDatasheet: false };
     const jt = isJson ? detectJsonType(document.getElementById('source-editor').value) : { isObject: false, isArray: false };
+    const hasTree = isJson && (jt.isObject || jt.isArray);
 
     const modeToolbar = document.getElementById('mode-toolbar');
+
+    if (isImage) {
+        modeToolbar.innerHTML = `<span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>`;
+        return;
+    }
+
     modeToolbar.innerHTML = `
         <button class="btn btn-sm${state.editorMode === 'source' ? ' active' : ''}" id="mode-source">Source</button>
         ${isMd ? `<button class="btn btn-sm${state.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg">Preview</button>` : ''}
-        ${(isJson && ds.isDatasheet) ? `<button class="btn btn-sm${state.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet">Datasheet</button>` : ''}
-        ${(isJson && (jt.isObject || jt.isArray)) ? `<button class="btn btn-sm${state.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview">Tree</button>` : ''}
+        ${hasTree ? `<button class="btn btn-sm${state.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview">Tree</button>` : ''}
         <span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>
     `;
 
     document.getElementById('mode-source')?.addEventListener('click', () => switchToMode('source'));
     document.getElementById('mode-wysiwyg')?.addEventListener('click', () => switchToMode('wysiwyg'));
-    document.getElementById('mode-datasheet')?.addEventListener('click', () => switchToMode('datasheet'));
     document.getElementById('mode-treeview')?.addEventListener('click', () => switchToMode('treeview'));
 }
 
@@ -448,25 +508,287 @@ async function resolveLocalImages(container) {
     }
 }
 
+// =========================================================================
+// Syntax Highlighting
+// =========================================================================
+
+function getCodeLang(pre) {
+    const md = pre.getAttribute('data-md') || '';
+    const match = md.match(/^```(\w+)/);
+    return match ? match[1].toLowerCase() : '';
+}
+
+function getHighlightRules(lang) {
+    const comment = (pattern) => ({ regex: pattern, type: 'comment' });
+    const str = (pattern) => ({ regex: pattern, type: 'string' });
+    const num = { regex: /\b\d+(\.\d+)?([eE][+-]?\d+)?\b/y, type: 'number' };
+    const op = { regex: /[+\-*/%&|^~<>!=?:;,.()[\]{}]+/y, type: 'operator' };
+
+    switch (lang) {
+        case 'js': case 'javascript': case 'ts': case 'typescript': case 'jsx': case 'tsx':
+            return [
+                comment(/\/\/[^\n]*/y),
+                comment(/\/\*[\s\S]*?\*\//y),
+                str(/`(?:[^`\\]|\\.)*`/y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                str(/'(?:[^'\\]|\\.)*'/y),
+                { regex: /\b(break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|finally|for|function|if|import|in|instanceof|let|new|of|return|static|super|switch|this|throw|try|typeof|var|void|while|with|yield|async|await)\b/y, type: 'keyword' },
+                { regex: /\b(Array|Boolean|Date|Error|Function|Map|Number|Object|Promise|RegExp|Set|String|Symbol|WeakMap|WeakSet|JSON|Math|console|document|window|undefined|null|true|false|NaN|Infinity)\b/y, type: 'type' },
+                num, op,
+            ];
+        case 'go':
+            return [
+                comment(/\/\/[^\n]*/y),
+                comment(/\/\*[\s\S]*?\*\//y),
+                str(/`(?:[^`])*`/y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                str(/'(?:[^'\\]|\\.)*'/y),
+                { regex: /\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var)\b/y, type: 'keyword' },
+                { regex: /\b(bool|byte|complex64|complex128|error|float32|float64|int|int8|int16|int32|int64|rune|string|uint|uint8|uint16|uint32|uint64|uintptr|true|false|nil|iota|append|cap|close|copy|delete|len|make|new|panic|print|println|recover)\b/y, type: 'type' },
+                num, op,
+            ];
+        case 'py': case 'python':
+            return [
+                comment(/#[^\n]*/y),
+                str(/"""[\s\S]*?"""/y),
+                str(/'''[\s\S]*?'''/y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                str(/'(?:[^'\\]|\\.)*'/y),
+                { regex: /\b(and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield)\b/y, type: 'keyword' },
+                { regex: /\b(True|False|None|int|float|str|list|dict|set|tuple|bool|type|object|super|print|len|range|enumerate|zip|map|filter|sorted|reversed|open|input)\b/y, type: 'builtin' },
+                num, op,
+            ];
+        case 'rs': case 'rust':
+            return [
+                comment(/\/\/[^\n]*/y),
+                comment(/\/\*[\s\S]*?\*\//y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                { regex: /\b(as|async|await|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|true|type|unsafe|use|where|while)\b/y, type: 'keyword' },
+                { regex: /\b(bool|char|f32|f64|i8|i16|i32|i64|i128|isize|str|u8|u16|u32|u64|u128|usize|String|Vec|Option|Result|Box|Rc|Arc|HashMap|HashSet)\b/y, type: 'type' },
+                num, op,
+            ];
+        case 'sh': case 'bash': case 'shell': case 'zsh':
+            return [
+                comment(/#[^\n]*/y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                str(/'[^']*'/y),
+                { regex: /\b(if|then|else|elif|fi|for|while|do|done|case|esac|in|function|return|exit|echo|export|source|local|readonly|shift|unset|set|trap)\b/y, type: 'keyword' },
+                num, op,
+            ];
+        case 'json':
+            return [
+                str(/"(?:[^"\\]|\\.)*"/y),
+                { regex: /\b(true|false|null)\b/y, type: 'keyword' },
+                num, op,
+            ];
+        case 'css':
+            return [
+                comment(/\/\*[\s\S]*?\*\//y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                str(/'(?:[^'\\]|\\.)*'/y),
+                { regex: /\b(important|auto|none|inherit|initial|unset|normal|bold|italic|solid|dashed|dotted|left|right|center|top|bottom|flex|grid|block|inline|absolute|relative|fixed|sticky|hidden|visible)\b/y, type: 'keyword' },
+                { regex: /\b\d+(\.\d+)?(px|em|rem|vh|vw|%|pt|cm|mm|s|ms)?\b/y, type: 'number' },
+                { regex: /#[0-9a-fA-F]{3,6}\b/y, type: 'string' },
+                op,
+            ];
+        case 'html': case 'xml':
+            return [
+                comment(/<!--[\s\S]*?-->/y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                str(/'(?:[^'\\]|\\.)*'/y),
+                { regex: /<\/?[a-zA-Z][a-zA-Z0-9-]*/y, type: 'keyword' },
+                op,
+            ];
+        case 'yaml': case 'yml':
+            return [
+                comment(/#[^\n]*/y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                str(/'[^']*'/y),
+                { regex: /\b(true|false|null|yes|no|on|off)\b/y, type: 'keyword' },
+                num, op,
+            ];
+        case 'md': case 'markdown':
+            return [
+                // Fenced code blocks
+                { regex: /```[\s\S]*?```/y, type: 'comment' },
+                // Inline code
+                str(/`[^`\n]+`/y),
+                // Headers
+                { regex: /^#{1,6} [^\n]*/my, type: 'keyword' },
+                // Blockquotes
+                { regex: /^> [^\n]*/my, type: 'comment' },
+                // Bold
+                { regex: /\*\*[^*\n]+\*\*/y, type: 'type' },
+                { regex: /__[^_\n]+__/y, type: 'type' },
+                // Italic
+                { regex: /\*[^*\n]+\*/y, type: 'string' },
+                { regex: /_[^_\n]+_/y, type: 'string' },
+                // Links and images
+                { regex: /!?\[[^\]\n]*\]\([^)\n]*\)/y, type: 'builtin' },
+                // List markers
+                { regex: /^[-*+] /my, type: 'operator' },
+                { regex: /^\d+\. /my, type: 'number' },
+                // Horizontal rules
+                { regex: /^[-*]{3,}$/my, type: 'operator' },
+            ];
+        default:
+            return [
+                comment(/\/\/[^\n]*/y),
+                comment(/#[^\n]*/y),
+                comment(/\/\*[\s\S]*?\*\//y),
+                str(/"(?:[^"\\]|\\.)*"/y),
+                str(/'(?:[^'\\]|\\.)*'/y),
+                num, op,
+            ];
+    }
+}
+
+function tokenize(code, rules) {
+    const tokens = [];
+    let i = 0;
+    const len = code.length;
+
+    while (i < len) {
+        let matched = false;
+        for (const rule of rules) {
+            rule.regex.lastIndex = i;
+            const m = rule.regex.exec(code);
+            if (m && m.index === i) {
+                tokens.push({ type: rule.type, value: m[0] });
+                i += m[0].length;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            const last = tokens[tokens.length - 1];
+            if (last && last.type === 'plain') {
+                last.value += code[i];
+            } else {
+                tokens.push({ type: 'plain', value: code[i] });
+            }
+            i++;
+        }
+    }
+    return tokens;
+}
+
+function highlightCode(text, lang) {
+    const rules = getHighlightRules(lang);
+    const tokens = tokenize(text, rules);
+    return tokens.map(t => {
+        const escaped = t.value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        if (t.type === 'plain') return escaped;
+        return `<span class="tok-${t.type}">${escaped}</span>`;
+    }).join('');
+}
+
+function applySyntaxHighlighting(container) {
+    container.querySelectorAll('pre > code').forEach(code => {
+        try {
+            const pre = code.parentElement;
+            const lang = getCodeLang(pre);
+            const text = code.textContent;
+            code.innerHTML = highlightCode(text, lang);
+        } catch (e) {
+            console.error('Syntax highlight error:', e);
+        }
+    });
+}
+
+// =========================================================================
+// Autosave
+// =========================================================================
+
+function loadAutosavePref() {
+    const saved = localStorage.getItem('hotnote2-autosave');
+    return saved !== null ? saved === 'true' : true; // default enabled
+}
+
+function saveAutosavePref(enabled) {
+    localStorage.setItem('hotnote2-autosave', String(enabled));
+}
+
+function startAutosaveTimer() {
+    if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
+    state.autosaveTimer = setTimeout(() => {
+        state.autosaveTimer = null;
+        if (state.isDirty && state.currentFileHandle && state.autosaveEnabled) {
+            saveFile(true);
+        }
+    }, 2000);
+}
+
+function animateAutosaveLabel() {
+    const label = document.getElementById('autosave-label');
+    if (!label) return;
+    label.textContent = 'saved';
+    label.classList.remove('fade-out', 'hidden');
+    setTimeout(() => {
+        label.classList.add('fade-out');
+        setTimeout(() => {
+            label.textContent = 'autosave';
+            label.classList.remove('fade-out');
+        }, 500);
+    }, 1500);
+}
+
+function updateSourceHighlight() {
+    const codeEl = document.getElementById('source-highlight-code');
+    if (!codeEl) return;
+    const textarea = document.getElementById('source-editor');
+    const content = textarea.value;
+    const lang = getExtension(state.currentFilename);
+
+    // Trailing newline prevents last-line clipping
+    codeEl.innerHTML = highlightCode(content + '\n', lang);
+
+    // Update line numbers
+    const lineNumEl = document.getElementById('line-numbers');
+    if (lineNumEl) {
+        const lineCount = (content.match(/\n/g) || []).length + 1;
+        lineNumEl.textContent = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
+    }
+}
+
+function _scrollElForMode(mode) {
+    if (mode === 'source') return document.getElementById('source-editor');
+    if (mode === 'wysiwyg') return document.getElementById('wysiwyg');
+    if (mode === 'treeview') return document.getElementById('s3-treeview');
+    if (mode === 'image') return document.getElementById('image-viewer');
+    return null;
+}
+
 function switchToMode(mode, content) {
+    // Save scroll position of current panel before switching
+    const prevEl = _scrollElForMode(state.editorMode);
+    if (prevEl) state.scrollPositions[state.editorMode] = prevEl.scrollTop;
+
     state.editorMode = mode;
 
+    const wrap = document.getElementById('source-editor-wrap');
     const textarea = document.getElementById('source-editor');
     const wysiwyg = document.getElementById('wysiwyg');
     const datasheet = document.getElementById('s3-datasheet');
     const treeview = document.getElementById('s3-treeview');
+    const imageViewer = document.getElementById('image-viewer');
 
     // Hide all panels
-    textarea.style.display = 'none';
+    wrap.style.display = 'none';
     wysiwyg.style.display = 'none';
     datasheet.style.display = 'none';
     treeview.style.display = 'none';
+    imageViewer.style.display = 'none';
 
     const currentContent = content !== undefined ? content : textarea.value;
 
     switch (mode) {
         case 'source':
-            textarea.style.display = 'block';
+            wrap.style.display = 'block';
+            updateSourceHighlight();
             textarea.focus();
             break;
 
@@ -480,17 +802,8 @@ function switchToMode(mode, content) {
                 wysiwyg.textContent = currentContent;
             }
             resolveLocalImages(wysiwyg).catch(console.error);
+            applySyntaxHighlighting(wysiwyg);
             break;
-
-        case 'datasheet': {
-            const parsed = JSON.parse(currentContent);
-            state.datasheetData = parsed;
-            state.datasheetSchema = inferSchema(parsed);
-            state.datasheetPage = 1;
-            datasheet.style.display = 'flex';
-            renderDatasheet();
-            break;
-        }
 
         case 'treeview': {
             const jt = detectJsonType(currentContent);
@@ -500,7 +813,19 @@ function switchToMode(mode, content) {
             renderTreeView();
             break;
         }
+
+        case 'image':
+            imageViewer.style.display = 'flex';
+            imageViewer.innerHTML = state.imageObjectUrl
+                ? `<img src="${state.imageObjectUrl}" alt="${escapeHtml(state.currentFilename)}">`
+                : `<p style="color:var(--color-text-tertiary)">Failed to load image</p>`;
+            break;
+
     }
+
+    // Restore scroll position for this mode (0 = top if not previously saved)
+    const newEl = _scrollElForMode(mode);
+    if (newEl) newEl.scrollTop = state.scrollPositions[mode] || 0;
 
     // Update toolbar buttons
     document.querySelectorAll('#mode-toolbar .btn').forEach(btn => {
@@ -516,13 +841,14 @@ function clearEditor() {
     state.editorMode = 'source';
     updateTitle();
 
+    const wrap = document.getElementById('source-editor-wrap');
     const textarea = document.getElementById('source-editor');
     const wysiwyg = document.getElementById('wysiwyg');
     const datasheet = document.getElementById('s3-datasheet');
     const treeview = document.getElementById('s3-treeview');
     const toolbar = document.getElementById('mode-toolbar');
 
-    textarea.style.display = 'none';
+    wrap.style.display = 'none';
     textarea.value = '';
     wysiwyg.style.display = 'none';
     datasheet.style.display = 'none';
@@ -537,13 +863,19 @@ function clearEditor() {
         emptyState.innerHTML = '<h2>No file open</h2><p>Use <b>Open Folder</b> to browse local files.</p>';
         editorArea.appendChild(emptyState);
     }
+
+    // Disable autosave controls when no file is open
+    const autosaveCheckbox = document.getElementById('autosave-checkbox');
+    const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
+    if (autosaveCheckbox) autosaveCheckbox.disabled = true;
+    if (autosaveToggleLabel) autosaveToggleLabel.style.opacity = '0.4';
 }
 
 // =========================================================================
 // Save
 // =========================================================================
 
-async function saveFile() {
+async function saveFile(silent = false) {
     if (!state.currentFileHandle) return;
     const textarea = document.getElementById('source-editor');
     try {
@@ -552,8 +884,10 @@ async function saveFile() {
         updateTitle();
         const saveBtn = document.getElementById('save-btn');
         if (saveBtn) { saveBtn.classList.remove('dirty'); saveBtn.disabled = true; }
+        if (silent) animateAutosaveLabel();
     } catch (err) {
-        alert(`Failed to save: ${err.message}`);
+        if (!silent) alert(`Failed to save: ${err.message}`);
+        else console.error('Autosave failed:', err);
     }
 }
 
@@ -564,6 +898,7 @@ function setDirty() {
         const saveBtn = document.getElementById('save-btn');
         if (saveBtn) { saveBtn.classList.add('dirty'); saveBtn.disabled = false; }
     }
+    startAutosaveTimer();
 }
 
 function updateTitle() {
@@ -575,6 +910,11 @@ function updateTitle() {
 // =========================================================================
 // Sidebar Resize
 // =========================================================================
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.toggle('collapsed');
+}
 
 function initResizeHandle() {
     const handle = document.getElementById('resize-handle');
@@ -594,7 +934,7 @@ function initResizeHandle() {
 
     document.addEventListener('mousemove', (e) => {
         if (!handle.classList.contains('dragging')) return;
-        const newWidth = Math.max(120, Math.min(600, startWidth + (e.clientX - startX)));
+        const newWidth = Math.max(144, Math.min(720, startWidth + (e.clientX - startX)));
         sidebar.style.width = `${newWidth}px`;
     });
 
@@ -835,22 +1175,6 @@ function renderTreeView() {
         });
     });
 
-    // Attach datasheet link handlers
-    container.querySelectorAll('.tree-datasheet-link').forEach(el => {
-        el.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Navigate data path to get the array
-            const path = el.dataset.treePath;
-            const arr = getValueAtPath(state.treeviewData, path);
-            if (arr) {
-                state.datasheetData = arr;
-                state.datasheetSchema = inferSchema(arr);
-                state.datasheetPage = 1;
-                switchToMode('datasheet');
-                updateModeToolbar();
-            }
-        });
-    });
 }
 
 function getValueAtPath(root, path) {
@@ -893,17 +1217,12 @@ function renderTreeNode(value, path, key) {
 
     if (Array.isArray(value)) {
         const toggleIcon = isCollapsed ? '▶' : '▼';
-        const canShowDatasheet = value.length > 0 &&
-            value.every((item) => typeof item === 'object' && item !== null && !Array.isArray(item));
 
         let html = `<div class="tree-item tree-expandable">
             <span class="tree-toggle" data-tree-path="${escapeHtml(fullPath)}">${toggleIcon}</span>
             <span class="tree-key">${escapeHtml(String(key))}:</span>
             <span class="tree-bracket">[</span><span class="tree-count">${value.length} items</span><span class="tree-bracket">]</span>`;
 
-        if (canShowDatasheet) {
-            html += ` <a href="#" class="tree-datasheet-link" data-tree-path="${escapeHtml(fullPath)}">(datasheet)</a>`;
-        }
         html += '</div>';
 
         if (!isCollapsed) {
@@ -1029,16 +1348,45 @@ document.addEventListener('DOMContentLoaded', () => {
     // Open folder button
     document.getElementById('open-folder')?.addEventListener('click', openFolder);
 
+    // Wysiwyg link clicks — open in new tab so we don't navigate away
+    document.getElementById('wysiwyg')?.addEventListener('click', (e) => {
+        const link = e.target.closest('a[href]');
+        if (!link) return;
+        e.preventDefault();
+        const href = link.getAttribute('href');
+        if (href && href !== '#') {
+            window.open(href, '_blank', 'noopener,noreferrer');
+        }
+    });
+
     // Save button
     const saveBtn = document.getElementById('save-btn');
     saveBtn?.addEventListener('click', saveFile);
 
     // Sidebar toolbar buttons
+    document.getElementById('up-btn')?.addEventListener('click', navigateUp);
     document.getElementById('new-file-btn')?.addEventListener('click', showNewFileInput);
     document.getElementById('new-folder-btn')?.addEventListener('click', showNewFolderInput);
 
-    // Textarea dirty tracking
-    document.getElementById('source-editor')?.addEventListener('input', setDirty);
+    // Textarea dirty tracking + highlight sync
+    const sourceEditor = document.getElementById('source-editor');
+    sourceEditor?.addEventListener('input', () => {
+        setDirty();
+        updateSourceHighlight();
+    });
+
+    // Scroll sync: keep highlight backdrop and line numbers aligned with textarea
+    sourceEditor?.addEventListener('scroll', () => {
+        const backdrop = document.getElementById('source-highlight-backdrop');
+        const lineNums = document.getElementById('line-numbers');
+        if (backdrop) {
+            backdrop.scrollTop = sourceEditor.scrollTop;
+            backdrop.scrollLeft = sourceEditor.scrollLeft;
+        }
+        if (lineNums) {
+            lineNums.scrollTop = sourceEditor.scrollTop;
+        }
+    });
 
     // Ctrl+S / Cmd+S save
     document.addEventListener('keydown', (e) => {
@@ -1051,6 +1399,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Resize handle
     initResizeHandle();
 
+    // Sidebar toggle
+    document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
+
+    // Auto-collapse sidebar on narrow viewports
+    const autoCollapseMQ = window.matchMedia('(max-width: 720px)');
+    function handleAutoCollapse(mq) {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+        if (mq.matches) {
+            sidebar.classList.add('collapsed');
+        }
+    }
+    autoCollapseMQ.addEventListener('change', handleAutoCollapse);
+    handleAutoCollapse(autoCollapseMQ);
+
     // Nested modal close
     document.getElementById('nested-modal-close')?.addEventListener('click', closeNestedModal);
     document.getElementById('nested-modal')?.addEventListener('click', (e) => {
@@ -1062,6 +1425,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('resize-handle').style.display = 'none';
     clearEditor();
     updateTitle();
+
+    // Autosave init
+    state.autosaveEnabled = loadAutosavePref();
+    const autosaveCheckbox = document.getElementById('autosave-checkbox');
+    const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
+    if (autosaveCheckbox) {
+        autosaveCheckbox.addEventListener('change', (e) => {
+            state.autosaveEnabled = e.target.checked;
+            saveAutosavePref(e.target.checked);
+        });
+    }
+    // Initially disabled until a file is open (clearEditor will set these too, but explicit here)
+    if (autosaveToggleLabel) autosaveToggleLabel.style.opacity = '0.4';
+    if (autosaveCheckbox) autosaveCheckbox.disabled = true;
 
     // Check if File System Access API is available
     if (!window.showDirectoryPicker) {
