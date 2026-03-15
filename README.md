@@ -2,6 +2,9 @@
 
 [https://hotnote.io](https://hotnote.io)
 
+> [!NOTE]
+> The app was recently rewritten to be pure Javascript removing external dependancies. Some advanced editing features were temporarily removed as a result (until we reintegrate them as native implementations)
+
 Minimalist online code editor with local filesystem access.
 
 We ❤️ lean software and dream of the days of MS Edit and Windows 3.11.
