@@ -218,55 +218,104 @@ async function renderSidebar() {
 
     list.innerHTML = '';
     for (const entry of entries) {
-        const li = renderFileEntry(entry);
+        const li = renderFileEntry(entry, state.currentDirHandle);
         list.appendChild(li);
     }
 }
 
-function renderFileEntry(entry) {
+const CHEVRON_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
+const DELETE_SVG = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+function renderFileEntry(entry, parentHandle) {
     const li = document.createElement('li');
     li.className = 'file-entry';
-    if (entry.name === state.currentFilename && entry.kind === 'file') {
+    if (entry.kind === 'file' && entry.name === state.currentFilename) {
         li.classList.add('active');
     }
 
     const icon = getFileIconSvg(entry.name, entry.kind);
-    li.innerHTML = `
-        <span class="icon">${icon}</span>
-        <span class="name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
-        <button class="delete-btn" title="Delete ${escapeHtml(entry.name)}" aria-label="Delete ${escapeHtml(entry.name)}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    `;
+    const deleteBtn = `<button class="delete-btn" title="Delete ${escapeHtml(entry.name)}" aria-label="Delete ${escapeHtml(entry.name)}">${DELETE_SVG}</button>`;
 
-    // Click handler
-    li.addEventListener('click', async (e) => {
-        if (e.target.classList.contains('delete-btn')) return;
-        if (entry.kind === 'directory') {
-            // Drill into folder
-            state.pathStack.push({ handle: entry.handle, name: entry.name });
-            state.currentDirHandle = entry.handle;
-            await renderSidebar();
-            renderBreadcrumb();
-        } else {
+    if (entry.kind === 'directory') {
+        li.innerHTML = `<div class="file-entry-row">
+            <button class="folder-toggle" aria-label="Toggle ${escapeHtml(entry.name)}">${CHEVRON_SVG}</button>
+            <span class="icon">${icon}</span>
+            <span class="name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+            ${deleteBtn}
+        </div>`;
+
+        li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
+            if (e.target.closest('.delete-btn')) return;
+            await toggleFolder(li, entry.handle);
+        });
+    } else {
+        li.innerHTML = `<div class="file-entry-row">
+            <span class="toggle-spacer"></span>
+            <span class="icon">${icon}</span>
+            <span class="name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+            ${deleteBtn}
+        </div>`;
+
+        li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
+            if (e.target.closest('.delete-btn')) return;
             await openFile(entry.handle, entry.name);
-        }
-    });
+        });
+    }
 
-    // Delete button
     li.querySelector('.delete-btn').addEventListener('click', async (e) => {
         e.stopPropagation();
         if (!confirm(`Delete "${entry.name}"?`)) return;
+        const dirHandle = parentHandle || state.currentDirHandle;
         try {
-            await deleteEntry(entry.name);
-            if (entry.name === state.currentFilename) {
+            await dirHandle.removeEntry(entry.name, { recursive: true });
+            if (entry.kind === 'file' && entry.name === state.currentFilename) {
                 clearEditor();
             }
-            await renderSidebar();
+            // Remove the entry from DOM directly if it's a nested entry
+            if (parentHandle) {
+                li.remove();
+            } else {
+                await renderSidebar();
+            }
         } catch (err) {
             alert(`Failed to delete: ${err.message}`);
         }
     });
 
     return li;
+}
+
+async function toggleFolder(li, handle) {
+    const isExpanded = li.classList.contains('expanded');
+    if (isExpanded) {
+        li.querySelector('.folder-children')?.remove();
+        li.classList.remove('expanded');
+        return;
+    }
+
+    li.classList.add('expanded');
+    let entries;
+    try {
+        entries = await listDirectory(handle);
+    } catch (err) {
+        li.classList.remove('expanded');
+        alert(`Failed to read folder: ${err.message}`);
+        return;
+    }
+
+    const childUl = document.createElement('ul');
+    childUl.className = 'folder-children';
+    if (!entries.length) {
+        const emptyLi = document.createElement('li');
+        emptyLi.style.cssText = 'color:var(--color-text-tertiary);padding:0.2rem 0.75rem;font-size:0.75rem;font-style:italic';
+        emptyLi.textContent = 'Empty folder';
+        childUl.appendChild(emptyLi);
+    } else {
+        for (const child of entries) {
+            childUl.appendChild(renderFileEntry(child, handle));
+        }
+    }
+    li.appendChild(childUl);
 }
 
 function getFileIconSvg(name, kind) {
@@ -369,14 +418,7 @@ async function openFile(fileHandle, filename) {
     state.scrollPositions = {};
 
     let content = '';
-    if (isTextFile(filename)) {
-        try {
-            content = await readFile(fileHandle);
-        } catch (err) {
-            alert(`Failed to read file: ${err.message}`);
-            return;
-        }
-    } else if (isImageFile(filename)) {
+    if (isImageFile(filename)) {
         if (state.imageObjectUrl) {
             URL.revokeObjectURL(state.imageObjectUrl);
             state.imageObjectUrl = null;
@@ -386,6 +428,13 @@ async function openFile(fileHandle, filename) {
             state.imageObjectUrl = URL.createObjectURL(file);
         } catch (err) {
             alert(`Failed to read image: ${err.message}`);
+            return;
+        }
+    } else {
+        try {
+            content = await readFile(fileHandle);
+        } catch (err) {
+            alert(`Failed to read file: ${err.message}`);
             return;
         }
     }
