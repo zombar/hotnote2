@@ -138,8 +138,13 @@
             return protect(`<del data-md="${escapeHtml(match)}">${content}</del>`);
         });
 
-        // Restore protected spans
-        result = result.replace(/\uFFFE(\d+)\uFFFE/g, (_, i) => spans[parseInt(i, 10)]);
+        // Restore protected spans — loop until stable so nested protections
+        // (e.g. image inside a link) are fully resolved in multiple passes
+        let _prev;
+        do {
+            _prev = result;
+            result = result.replace(/\uFFFE(\d+)\uFFFE/g, (_, i) => spans[parseInt(i, 10)]);
+        } while (result !== _prev);
 
         return result;
     }
