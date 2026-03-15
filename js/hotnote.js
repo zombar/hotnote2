@@ -616,10 +616,14 @@ function highlightCode(text, lang) {
 
 function applySyntaxHighlighting(container) {
     container.querySelectorAll('pre > code').forEach(code => {
-        const pre = code.parentElement;
-        const lang = getCodeLang(pre);
-        const text = code.textContent;
-        code.innerHTML = highlightCode(text, lang);
+        try {
+            const pre = code.parentElement;
+            const lang = getCodeLang(pre);
+            const text = code.textContent;
+            code.innerHTML = highlightCode(text, lang);
+        } catch (e) {
+            console.error('Syntax highlight error:', e);
+        }
     });
 }
 

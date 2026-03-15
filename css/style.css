@@ -797,14 +797,15 @@ main {
 
 /* =====================================================================
    Syntax Highlighting Token Classes
+   Use .s3-wysiwyg pre code prefix to beat the color rule on <code>
    ===================================================================== */
-.tok-keyword  { color: var(--tok-keyword); font-weight: 600; }
-.tok-type     { color: var(--tok-type); }
-.tok-string   { color: var(--tok-string); }
-.tok-number   { color: var(--tok-number); }
-.tok-comment  { color: var(--tok-comment); font-style: italic; }
-.tok-builtin  { color: var(--tok-builtin); }
-.tok-operator { color: var(--tok-operator); }
+.s3-wysiwyg pre code .tok-keyword  { color: var(--tok-keyword); font-weight: 600; }
+.s3-wysiwyg pre code .tok-type     { color: var(--tok-type); }
+.s3-wysiwyg pre code .tok-string   { color: var(--tok-string); }
+.s3-wysiwyg pre code .tok-number   { color: var(--tok-number); }
+.s3-wysiwyg pre code .tok-comment  { color: var(--tok-comment); font-style: italic; }
+.s3-wysiwyg pre code .tok-builtin  { color: var(--tok-builtin); }
+.s3-wysiwyg pre code .tok-operator { color: var(--tok-operator); }
 
 /* =====================================================================
    Autosave Toggle
