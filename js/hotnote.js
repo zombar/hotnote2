@@ -1348,6 +1348,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Open folder button
     document.getElementById('open-folder')?.addEventListener('click', openFolder);
 
+    // Wysiwyg link clicks — open in new tab so we don't navigate away
+    document.getElementById('wysiwyg')?.addEventListener('click', (e) => {
+        const link = e.target.closest('a[href]');
+        if (!link) return;
+        e.preventDefault();
+        const href = link.getAttribute('href');
+        if (href && href !== '#') {
+            window.open(href, '_blank', 'noopener,noreferrer');
+        }
+    });
+
     // Save button
     const saveBtn = document.getElementById('save-btn');
     saveBtn?.addEventListener('click', saveFile);
