@@ -606,9 +606,39 @@ async function navigateHistory(delta) {
         if (!confirm('You have unsaved changes. Discard?')) return;
         state.isDirty = false;
     }
+
+    // Save cursor + scroll of current file before leaving
+    const curEntry = state.fileHistory[state.fileHistoryIndex];
+    if (curEntry) {
+        const sourceEditor = document.getElementById('source-editor');
+        const scrollEl = _scrollElForMode(state.editorMode);
+        curEntry.pos = {
+            cursorStart: sourceEditor?.selectionStart ?? 0,
+            cursorEnd: sourceEditor?.selectionEnd ?? 0,
+            scrollPositions: {
+                ...state.scrollPositions,
+                ...(scrollEl ? { [state.editorMode]: scrollEl.scrollTop } : {}),
+            },
+        };
+    }
+
     state.fileHistoryIndex = target;
-    const { handle, name } = state.fileHistory[target];
+    const { handle, name, pos } = state.fileHistory[target];
     await openFile(handle, name, false);
+
+    // Restore cursor + scroll for the target file
+    if (pos) {
+        if (pos.scrollPositions) {
+            state.scrollPositions = { ...pos.scrollPositions };
+            const scrollEl = _scrollElForMode(state.editorMode);
+            if (scrollEl) scrollEl.scrollTop = pos.scrollPositions[state.editorMode] || 0;
+        }
+        const sourceEditor = document.getElementById('source-editor');
+        if (sourceEditor && pos.cursorStart !== undefined) {
+            sourceEditor.selectionStart = pos.cursorStart;
+            sourceEditor.selectionEnd = pos.cursorEnd;
+        }
+    }
 }
 
 function determineInitialMode(ext, content) {
