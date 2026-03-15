@@ -1,4 +1,10 @@
-# HotNote2
+# Hotnote
+
+[https://hotnote.io](https://hotnote.io)
+
+Minimalist online code editor with local filesystem access.
+
+We ❤️ lean software and dream of the days of MS Edit and Windows 3.11.
 
 A pure-JS, no-build notes app that runs directly in the browser. Uses the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) to read and write files on your local machine.
 
