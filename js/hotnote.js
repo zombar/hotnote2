@@ -571,6 +571,11 @@ async function openFile(fileHandle, filename) {
         autosaveCheckbox.checked = state.autosaveEnabled;
     }
     if (autosaveToggleLabel) autosaveToggleLabel.style.opacity = '';
+
+    // On narrow viewports, collapse sidebar after picking a file
+    if (window.innerWidth <= 720) {
+        document.getElementById('sidebar')?.classList.add('collapsed');
+    }
 }
 
 function determineInitialMode(ext, content) {
@@ -1631,12 +1636,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check if File System Access API is available
     if (!window.showDirectoryPicker) {
-        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
         const warning = document.createElement('div');
         warning.style.cssText = 'position:fixed;bottom:1rem;right:1rem;left:1rem;background:#f85149;color:#fff;padding:.75rem 1rem;border-radius:6px;font-size:.875rem;z-index:9999;text-align:center;';
-        warning.textContent = isMobile
-            ? 'Local file access is not supported on mobile browsers. Open hotnote.io on a desktop Chrome or Edge browser.'
-            : 'File System Access API not supported. Use Chrome or Edge.';
+        warning.textContent = 'File System Access API not supported. Use Chrome or Edge.';
         document.body.appendChild(warning);
     }
 });
