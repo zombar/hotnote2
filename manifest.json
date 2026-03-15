@@ -1,0 +1,17 @@
+{
+    "name": "hotnote",
+    "short_name": "hotnote",
+    "description": "Minimalist online code editor with local filesystem access.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0c0c0c",
+    "theme_color": "#252525",
+    "icons": [
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
