@@ -238,7 +238,7 @@ html[data-theme="light"] .logo {
     align-items: center;
     gap: 0.25rem;
     overflow: hidden;
-    font-size: 1.4625rem;
+    font-size: inherit;
     color: var(--color-text-secondary);
     min-width: 0;
     padding: 0 0.5rem;
