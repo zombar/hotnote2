@@ -72,6 +72,8 @@ const state = {
     autosaveTimer: null,
 };
 
+const dragState = { handle: null, parentHandle: null };
+
 // =========================================================================
 // Utility
 // =========================================================================
@@ -167,6 +169,41 @@ async function deleteEntry(name) {
     await state.currentDirHandle.removeEntry(name, { recursive: true });
 }
 
+async function copyDirInto(srcDir, destParent) {
+    const newDir = await destParent.getDirectoryHandle(srcDir.name, { create: true });
+    for await (const [, handle] of srcDir.entries()) {
+        if (handle.kind === 'file') {
+            const file = await handle.getFile();
+            const dh = await newDir.getFileHandle(handle.name, { create: true });
+            const w = await dh.createWritable();
+            await w.write(await file.arrayBuffer());
+            await w.close();
+        } else {
+            await copyDirInto(handle, newDir);
+        }
+    }
+}
+
+async function moveEntry(sourceParentHandle, entryHandle, destDirHandle) {
+    const name = entryHandle.name;
+    try {
+        if (entryHandle.kind === 'file') {
+            const file = await entryHandle.getFile();
+            const dh = await destDirHandle.getFileHandle(name, { create: true });
+            const w = await dh.createWritable();
+            await w.write(await file.arrayBuffer());
+            await w.close();
+        } else {
+            await copyDirInto(entryHandle, destDirHandle);
+        }
+        await sourceParentHandle.removeEntry(name, { recursive: true });
+        if (entryHandle === state.currentFileHandle) clearEditor();
+        await renderSidebar();
+    } catch (err) {
+        alert(`Failed to move: ${err.message}`);
+    }
+}
+
 // =========================================================================
 // Open Folder
 // =========================================================================
@@ -197,6 +234,11 @@ async function openFolder() {
 // Breadcrumb
 // =========================================================================
 
+function updateUpButton() {
+    const btn = document.getElementById('up-btn');
+    if (btn) btn.disabled = state.pathStack.length <= 1;
+}
+
 function renderBreadcrumb() {
     const el = document.getElementById('breadcrumb');
     if (!el) return;
@@ -224,18 +266,6 @@ function renderBreadcrumb() {
     updateUpButton();
 }
 
-function updateUpButton() {
-    const btn = document.getElementById('up-btn');
-    if (btn) btn.disabled = state.pathStack.length <= 1;
-}
-
-async function navigateUp() {
-    if (state.pathStack.length <= 1) return;
-    state.pathStack.pop();
-    state.currentDirHandle = state.pathStack[state.pathStack.length - 1].handle;
-    await renderSidebar();
-    renderBreadcrumb();
-}
 
 // =========================================================================
 // Sidebar / File Browser
@@ -276,6 +306,20 @@ function renderFileEntry(entry, parentHandle) {
         li.classList.add('active');
     }
 
+    li.setAttribute('draggable', 'true');
+    li.addEventListener('dragstart', (e) => {
+        dragState.handle = entry.handle;
+        dragState.parentHandle = parentHandle;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', entry.name);
+        requestAnimationFrame(() => li.classList.add('dragging'));
+    });
+    li.addEventListener('dragend', () => {
+        li.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        document.getElementById('file-list')?.classList.remove('drag-over-list');
+    });
+
     const icon = getFileIconSvg(entry.name, entry.kind);
     const deleteBtn = `<button class="delete-btn" title="Delete ${escapeHtml(entry.name)}" aria-label="Delete ${escapeHtml(entry.name)}">${DELETE_SVG}</button>`;
 
@@ -290,6 +334,27 @@ function renderFileEntry(entry, parentHandle) {
         li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
             if (e.target.closest('.delete-btn')) return;
             await toggleFolder(li, entry.handle);
+        });
+
+        li.addEventListener('dragover', (e) => {
+            if (!dragState.handle || dragState.handle === entry.handle) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            li.classList.add('drag-over');
+        });
+        li.addEventListener('dragleave', (e) => {
+            if (!li.contains(e.relatedTarget)) li.classList.remove('drag-over');
+        });
+        li.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            li.classList.remove('drag-over');
+            if (!dragState.handle || dragState.handle === entry.handle) return;
+            const { handle, parentHandle: srcParent } = dragState;
+            dragState.handle = null;
+            dragState.parentHandle = null;
+            await moveEntry(srcParent, handle, entry.handle);
         });
     } else {
         const unopenable = isUnopenable(entry);
@@ -1468,7 +1533,6 @@ document.addEventListener('DOMContentLoaded', () => {
     saveBtn?.addEventListener('click', saveFile);
 
     // Sidebar toolbar buttons
-    document.getElementById('up-btn')?.addEventListener('click', navigateUp);
     document.getElementById('new-file-btn')?.addEventListener('click', showNewFileInput);
     document.getElementById('new-folder-btn')?.addEventListener('click', showNewFolderInput);
 
@@ -1498,6 +1562,27 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             saveFile();
         }
+    });
+
+    // Drag-to-move: drop onto file-list background → move to current dir
+    const fileList = document.getElementById('file-list');
+    fileList?.addEventListener('dragover', (e) => {
+        if (!dragState.handle || dragState.parentHandle === state.currentDirHandle) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        fileList.classList.add('drag-over-list');
+    });
+    fileList?.addEventListener('dragleave', (e) => {
+        if (!fileList.contains(e.relatedTarget)) fileList.classList.remove('drag-over-list');
+    });
+    fileList?.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        fileList.classList.remove('drag-over-list');
+        if (!dragState.handle || dragState.parentHandle === state.currentDirHandle) return;
+        const { handle, parentHandle: srcParent } = dragState;
+        dragState.handle = null;
+        dragState.parentHandle = null;
+        await moveEntry(srcParent, handle, state.currentDirHandle);
     });
 
     // Resize handle
