@@ -441,6 +441,11 @@ main {
     font-size: 0.7rem;
 }
 
+.btn-icon {
+    padding: 0.25rem;
+    line-height: 0;
+}
+
 #save-btn.dirty {
     background: var(--color-accent-blue);
     border-color: var(--color-accent-blue);
