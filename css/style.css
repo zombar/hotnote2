@@ -177,9 +177,9 @@ header {
 
 .logo {
     font-family: var(--font-mono);
-    font-size: 1.08rem;
+    font-size: 1.35rem;
     font-weight: 900;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     white-space: nowrap;
     margin-right: 0.5rem;
@@ -299,8 +299,10 @@ main {
     gap: 0.25rem;
     padding: 0.375rem 0.625rem;
     background: var(--color-bg-toolbar);
-    border-bottom: 1px solid var(--color-border-primary);
+    box-shadow: 0 1px 0 var(--color-border-primary), 0 2px 6px rgba(0,0,0,0.20);
     flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
 
 #file-list {
@@ -311,50 +313,62 @@ main {
 }
 
 .file-entry {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 0.75rem;
-    cursor: pointer;
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
     position: relative;
     user-select: none;
-    border-radius: var(--panel-border-radius);
     margin: 0 0.25rem;
 }
 
-.file-entry:hover {
+.file-entry-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.75rem 0.3rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    border-radius: var(--panel-border-radius);
+}
+
+.file-entry-row:hover {
     background: var(--color-bg-tertiary);
     color: var(--color-text-primary);
 }
 
-.file-entry.active {
+.file-entry.active > .file-entry-row {
     background: var(--color-bg-tertiary);
     color: var(--color-text-primary);
     box-shadow: inset 2px 0 0 var(--color-text-primary);
 }
 
-.file-entry .icon {
+.file-entry.disabled > .file-entry-row {
+    opacity: 0.38;
+    cursor: default;
+}
+.file-entry.disabled > .file-entry-row:hover {
+    background: none;
+    color: var(--color-text-secondary);
+}
+
+.file-entry-row .icon {
     flex-shrink: 0;
     display: flex;
     align-items: center;
     color: var(--color-text-tertiary);
 }
 
-.file-entry.active .icon,
-.file-entry:hover .icon {
+.file-entry.active > .file-entry-row .icon,
+.file-entry-row:hover .icon {
     color: var(--color-text-secondary);
 }
 
-.file-entry .name {
+.file-entry-row .name {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.file-entry .delete-btn {
+.file-entry-row .delete-btn {
     display: none;
     background: none;
     border: none;
@@ -370,13 +384,47 @@ main {
     border-radius: var(--panel-border-radius);
 }
 
-.file-entry:hover .delete-btn {
+.file-entry-row:hover .delete-btn {
     display: flex;
 }
 
-.file-entry .delete-btn:hover {
+.file-entry-row .delete-btn:hover {
     color: var(--color-text-primary);
     background: var(--color-bg-tertiary);
+}
+
+/* Folder toggle chevron */
+.folder-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    transition: transform 0.12s ease;
+}
+
+.file-entry.expanded > .file-entry-row .folder-toggle {
+    transform: rotate(90deg);
+}
+
+/* Indented child list for expanded folders */
+.folder-children {
+    list-style: none;
+    padding: 0;
+    padding-left: 1.0rem;
+    margin: 0;
+}
+
+/* Spacer so file rows align with folder rows (no toggle) */
+.file-entry-row .toggle-spacer {
+    width: 1rem;
+    flex-shrink: 0;
 }
 
 .new-file-input-wrap {

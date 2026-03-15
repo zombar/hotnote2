@@ -95,7 +95,13 @@
         // Uses \uFFFE (Unicode non-character) as a sentinel that won't appear in markdown.
         const spans = [];
         function protect(html) {
-            spans.push(html);
+            // Escape any \uFFFE sentinels inside attribute values (="...") so
+            // the multi-pass unprotect loop cannot expand them into raw HTML
+            // inside attribute strings. \uFFFD is used as the safe substitute —
+            // it won't match the /\uFFFE(\d+)\uFFFE/ unprotect pattern.
+            const safe = html.replace(/="[^"]*\uFFFE[^"]*"/g, attr =>
+                attr.replace(/\uFFFE/g, '\uFFFD'));
+            spans.push(safe);
             return `\uFFFE${spans.length - 1}\uFFFE`;
         }
 
