@@ -1073,7 +1073,7 @@ function setDirty() {
 function updateTitle() {
     const prefix = state.isDirty ? '• ' : '';
     const filename = state.currentFilename ? ` — ${state.currentFilename}` : '';
-    document.title = `${prefix}HotNote2${filename}`;
+    document.title = `${prefix}hotnote${filename}`;
 }
 
 // =========================================================================
