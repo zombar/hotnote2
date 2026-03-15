@@ -808,6 +808,44 @@ main {
 .s3-wysiwyg pre code .tok-operator { color: var(--tok-operator); }
 
 /* =====================================================================
+   Code Highlight View (standalone code file viewer)
+   ===================================================================== */
+.code-highlight-view {
+    flex: 1;
+    overflow: auto;
+    background: var(--color-bg-primary);
+    padding: 0;
+}
+
+.code-highlight-pre {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    white-space: pre;
+    min-height: 100%;
+    box-sizing: border-box;
+    color: var(--color-text-primary);
+}
+
+.code-highlight-pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+}
+
+.code-highlight-pre .tok-keyword  { color: var(--tok-keyword); font-weight: 600; }
+.code-highlight-pre .tok-type     { color: var(--tok-type); }
+.code-highlight-pre .tok-string   { color: var(--tok-string); }
+.code-highlight-pre .tok-number   { color: var(--tok-number); }
+.code-highlight-pre .tok-comment  { color: var(--tok-comment); font-style: italic; }
+.code-highlight-pre .tok-builtin  { color: var(--tok-builtin); }
+.code-highlight-pre .tok-operator { color: var(--tok-operator); }
+
+/* =====================================================================
    Autosave Toggle
    ===================================================================== */
 .autosave-toggle {

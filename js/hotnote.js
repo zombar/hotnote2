@@ -14,6 +14,12 @@ const TEXT_EXTENSIONS = new Set([
     'graphql', 'proto', 'tf', 'hcl', 'log', 'csv',
 ]);
 
+const CODE_EXTENSIONS = new Set([
+    'js', 'ts', 'jsx', 'tsx', 'go', 'py', 'rb', 'rs', 'css', 'scss',
+    'html', 'htm', 'xml', 'sh', 'bash', 'zsh', 'yaml', 'yml',
+    'toml', 'sql', 'graphql', 'proto', 'tf', 'hcl', 'conf', 'ini', 'cfg',
+]);
+
 // =========================================================================
 // State
 // =========================================================================
@@ -24,7 +30,7 @@ const state = {
     currentFileHandle: null,
     currentFilename: '',
     isDirty: false,
-    editorMode: 'source', // 'source' | 'wysiwyg' | 'datasheet' | 'treeview'
+    editorMode: 'source', // 'source' | 'wysiwyg' | 'highlight' | 'datasheet' | 'treeview'
     // JSON view state
     datasheetData: null,
     datasheetSchema: null,
@@ -379,9 +385,16 @@ function determineInitialMode(ext, content) {
     // Markdown handling
     if (shouldUseWysiwygMode(ext, content)) {
         state.editorMode = 'wysiwyg';
-    } else {
-        state.editorMode = 'source';
+        return;
     }
+
+    // Code file handling — default to highlighted view
+    if (CODE_EXTENSIONS.has(ext)) {
+        state.editorMode = 'highlight';
+        return;
+    }
+
+    state.editorMode = 'source';
 }
 
 function renderEditor(content, filename) {
@@ -410,6 +423,7 @@ function updateModeToolbar() {
     const ext = getExtension(state.currentFilename);
     const isJson = ext === 'json';
     const isMd = ext === 'md';
+    const isCode = CODE_EXTENSIONS.has(ext);
 
     const ds = isJson ? detectDatasheetMode(document.getElementById('source-editor').value) : { isDatasheet: false };
     const jt = isJson ? detectJsonType(document.getElementById('source-editor').value) : { isObject: false, isArray: false };
@@ -418,6 +432,7 @@ function updateModeToolbar() {
     modeToolbar.innerHTML = `
         <button class="btn btn-sm${state.editorMode === 'source' ? ' active' : ''}" id="mode-source">Source</button>
         ${isMd ? `<button class="btn btn-sm${state.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg">Preview</button>` : ''}
+        ${(isCode || isJson) ? `<button class="btn btn-sm${state.editorMode === 'highlight' ? ' active' : ''}" id="mode-highlight">View</button>` : ''}
         ${(isJson && ds.isDatasheet) ? `<button class="btn btn-sm${state.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet">Datasheet</button>` : ''}
         ${(isJson && (jt.isObject || jt.isArray)) ? `<button class="btn btn-sm${state.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview">Tree</button>` : ''}
         <span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>
@@ -425,6 +440,7 @@ function updateModeToolbar() {
 
     document.getElementById('mode-source')?.addEventListener('click', () => switchToMode('source'));
     document.getElementById('mode-wysiwyg')?.addEventListener('click', () => switchToMode('wysiwyg'));
+    document.getElementById('mode-highlight')?.addEventListener('click', () => switchToMode('highlight'));
     document.getElementById('mode-datasheet')?.addEventListener('click', () => switchToMode('datasheet'));
     document.getElementById('mode-treeview')?.addEventListener('click', () => switchToMode('treeview'));
 }
@@ -715,6 +731,15 @@ function switchToMode(mode, content) {
             state.treeviewCollapsed = new Set();
             treeview.style.display = 'block';
             renderTreeView();
+            break;
+        }
+
+        case 'highlight': {
+            const lang = getExtension(state.currentFilename);
+            wysiwyg.style.display = 'block';
+            wysiwyg.className = 'code-highlight-view';
+            wysiwyg.contentEditable = 'false';
+            wysiwyg.innerHTML = `<pre class="code-highlight-pre"><code>${highlightCode(currentContent, lang)}</code></pre>`;
             break;
         }
     }
