@@ -1185,3 +1185,30 @@ main {
     background: var(--color-bg-tertiary);
     outline: 1px inset var(--color-border-primary);
 }
+
+/* =====================================================================
+   Mobile
+   ===================================================================== */
+@media (max-width: 720px) {
+    header {
+        padding: 0.5rem 0.4rem;
+        gap: 0.1rem;
+    }
+
+    .header-left,
+    .header-right {
+        gap: 0.1rem;
+    }
+
+    .logo {
+        display: none;
+    }
+
+    .autosave-toggle {
+        display: none;
+    }
+
+    #breadcrumb {
+        padding: 0 0.15rem;
+    }
+}

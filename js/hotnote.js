@@ -571,6 +571,11 @@ async function openFile(fileHandle, filename) {
         autosaveCheckbox.checked = state.autosaveEnabled;
     }
     if (autosaveToggleLabel) autosaveToggleLabel.style.opacity = '';
+
+    // On narrow viewports, collapse sidebar after picking a file
+    if (window.innerWidth <= 720) {
+        document.getElementById('sidebar')?.classList.add('collapsed');
+    }
 }
 
 function determineInitialMode(ext, content) {
