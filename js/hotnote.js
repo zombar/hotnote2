@@ -528,9 +528,12 @@ async function openFile(fileHandle, filename, pushHistory = true) {
     }
 
     if (pushHistory) {
-        state.fileHistory = state.fileHistory.slice(0, state.fileHistoryIndex + 1);
-        state.fileHistory.push({ handle: fileHandle, name: filename });
-        state.fileHistoryIndex = state.fileHistory.length - 1;
+        const current = state.fileHistory[state.fileHistoryIndex];
+        if (!current || current.handle !== fileHandle) {
+            state.fileHistory = state.fileHistory.slice(0, state.fileHistoryIndex + 1);
+            state.fileHistory.push({ handle: fileHandle, name: filename });
+            state.fileHistoryIndex = state.fileHistory.length - 1;
+        }
     }
 
     state.currentFileHandle = fileHandle;
