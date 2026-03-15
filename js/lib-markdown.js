@@ -301,7 +301,7 @@
             }
         }
 
-        const content = alertContent.map((line) => processInline(line)).join('<br>');
+        const content = alertContent.map((line) => processInline(line)).join(' ');
         const originalMd = originalLines.join('\n');
 
         if (alertType) {

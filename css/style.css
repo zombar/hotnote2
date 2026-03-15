@@ -277,7 +277,7 @@ main {
    ===================================================================== */
 #sidebar {
     width: var(--sidebar-width);
-    min-width: 144px;
+    min-width: var(--sidebar-width);
     max-width: 720px;
     display: flex;
     flex-direction: column;
@@ -821,7 +821,7 @@ main {
 
 /* Constrain reading width and center — padding grows to center at ~72ch */
 #wysiwyg.s3-wysiwyg {
-    padding: 2rem max(2rem, calc((100% - 72ch) / 2));
+    padding: 2rem max(2rem, calc((100% - 100ch) / 2));
 }
 
 .s3-wysiwyg:focus { outline: none; }
