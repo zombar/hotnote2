@@ -118,6 +118,8 @@ async function openFolder() {
         state.currentFileHandle = null;
         state.currentFilename = '';
         clearEditor();
+        document.getElementById('sidebar').style.display = '';
+        document.getElementById('resize-handle').style.display = '';
         await renderSidebar();
         renderBreadcrumb();
     } catch (err) {
@@ -1055,7 +1057,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === e.currentTarget) closeNestedModal();
     });
 
-    // Initial empty state
+    // Initial empty state — hide sidebar until a folder is opened
+    document.getElementById('sidebar').style.display = 'none';
+    document.getElementById('resize-handle').style.display = 'none';
     clearEditor();
     updateTitle();
 
