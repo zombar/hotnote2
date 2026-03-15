@@ -277,7 +277,7 @@ main {
    ===================================================================== */
 #sidebar {
     width: var(--sidebar-width);
-    min-width: 144px;
+    min-width: var(--sidebar-width);
     max-width: 720px;
     display: flex;
     flex-direction: column;

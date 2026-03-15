@@ -1138,7 +1138,8 @@ function initResizeHandle() {
 
     document.addEventListener('mousemove', (e) => {
         if (!handle.classList.contains('dragging')) return;
-        const newWidth = Math.max(144, Math.min(720, startWidth + (e.clientX - startX)));
+        const minWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 288;
+        const newWidth = Math.max(minWidth, Math.min(720, startWidth + (e.clientX - startX)));
         sidebar.style.width = `${newWidth}px`;
     });
 
