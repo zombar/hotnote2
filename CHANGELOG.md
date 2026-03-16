@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0] — 2026-03-16
+### Added
+- URL now tracks cursor column (`&char=N`) alongside line number (`&line=N`)
+- Column position persisted in localStorage (`hotnote2-lastChar`) and restored on resume
+- Back/forward navigation updates URL to reflect the navigated file's line and column
+- Resume prompt restores cursor to exact line and column on reload
+
 ## [0.5.0] — 2026-03-16
 ### Added
 - JSON array-of-objects files now open automatically in Table (datasheet) view

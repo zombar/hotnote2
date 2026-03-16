@@ -77,6 +77,7 @@ const state = {
     // Relative path from root to current file (tracks subdirs opened via sidebar tree)
     currentRelativePath: null,
     currentLine: 1,
+    currentChar: 1,
 };
 
 const dragState = { handle: null, parentHandle: null };
@@ -95,19 +96,22 @@ function updateURL() {
     const filePath = getRelativeFilePath();
     if (filePath) qs += '&file=' + filePath.split('/').map(encodeURIComponent).join('/');
     if (state.currentLine > 1) qs += '&line=' + state.currentLine;
+    if (state.currentChar > 1) qs += '&char=' + state.currentChar;
     history.replaceState(null, '', qs);
     localStorage.setItem('hotnote2-lastFolder', state.rootHandle.name);
     if (filePath) localStorage.setItem('hotnote2-lastFile', filePath);
     else localStorage.removeItem('hotnote2-lastFile');
     if (state.currentLine > 1) localStorage.setItem('hotnote2-lastLine', state.currentLine);
     else localStorage.removeItem('hotnote2-lastLine');
+    if (state.currentChar > 1) localStorage.setItem('hotnote2-lastChar', state.currentChar);
+    else localStorage.removeItem('hotnote2-lastChar');
 }
 
 function clearURL() {
     history.replaceState(null, '', window.location.pathname);
 }
 
-function scrollEditorToLine(lineNum) {
+function scrollEditorToPosition(lineNum, charNum) {
     const editor = document.getElementById('source-editor');
     if (!editor || lineNum <= 1) return;
     const lines = editor.value.split('\n');
@@ -115,13 +119,19 @@ function scrollEditorToLine(lineNum) {
     for (let i = 0; i < Math.min(lineNum - 1, lines.length); i++) {
         pos += lines[i].length + 1;
     }
+    if (charNum > 1) {
+        const lineLen = (lines[lineNum - 1] || '').length;
+        pos += Math.min(charNum - 1, lineLen);
+    }
     editor.selectionStart = editor.selectionEnd = pos;
     const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 20;
     editor.scrollTop = Math.max(0, (lineNum - 1) * lineHeight - editor.clientHeight / 2);
     state.currentLine = lineNum;
+    state.currentChar = charNum || 1;
 }
 
-async function openFileByPath(rootHandle, relativePath, lineNum) {
+
+async function openFileByPath(rootHandle, relativePath, lineNum, charNum) {
     try {
         const parts = relativePath.split('/').filter(Boolean);
         const filename = parts.pop();
@@ -133,7 +143,7 @@ async function openFileByPath(rootHandle, relativePath, lineNum) {
         state.currentRelativePath = relativePath;
         await openFile(fileHandle, filename);
         if (lineNum && lineNum > 1) {
-            scrollEditorToLine(lineNum);
+            scrollEditorToPosition(lineNum, charNum || 1);
             updateURL();
         }
     } catch (err) {
@@ -141,12 +151,13 @@ async function openFileByPath(rootHandle, relativePath, lineNum) {
     }
 }
 
-function showResumePrompt(folderName, filePath, lineNum) {
+function showResumePrompt(folderName, filePath, lineNum, charNum) {
     const banner = document.getElementById('resume-prompt');
     if (!banner) return;
     banner.querySelector('.resume-folder-name').textContent = folderName;
     banner.dataset.file = filePath || '';
     banner.dataset.line = lineNum && lineNum > 1 ? String(lineNum) : '';
+    banner.dataset.char = charNum && charNum > 1 ? String(charNum) : '';
     banner.style.display = '';
 }
 
@@ -605,6 +616,7 @@ async function openFile(fileHandle, filename, pushHistory = true) {
     state.currentFilename = filename;
     state.isDirty = false;
     state.currentLine = 1;
+    state.currentChar = 1;
     updateTitle();
 
     // Update sidebar active state
@@ -652,6 +664,8 @@ async function openFile(fileHandle, filename, pushHistory = true) {
                 sourceEditor.selectionEnd   = _cachedPos.cursorEnd;
                 const pos = _cachedPos.cursorStart;
                 state.currentLine = (sourceEditor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+                const lastNl = sourceEditor.value.lastIndexOf('\n', pos - 1);
+                state.currentChar = lastNl === -1 ? pos + 1 : pos - lastNl;
                 updateURL();
             }
         }, 0);
@@ -727,8 +741,13 @@ async function navigateHistory(delta) {
         if (sourceEditor && pos.cursorStart !== undefined) {
             sourceEditor.selectionStart = pos.cursorStart;
             sourceEditor.selectionEnd = pos.cursorEnd;
+            const cursorPos = pos.cursorStart;
+            state.currentLine = (sourceEditor.value.substring(0, cursorPos).match(/\n/g) || []).length + 1;
+            const lastNl = sourceEditor.value.lastIndexOf('\n', cursorPos - 1);
+            state.currentChar = lastNl === -1 ? cursorPos + 1 : cursorPos - lastNl;
         }
     }
+    updateURL();
 }
 
 function determineInitialMode(ext, content) {
@@ -1978,13 +1997,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const _workdir = _urlParams.get('workdir');
     const _file = _urlParams.get('file');
     const _urlLine = parseInt(_urlParams.get('line') || '0', 10) || 0;
+    const _urlChar = parseInt(_urlParams.get('char') || '0', 10) || 0;
     if (_workdir) {
-        showResumePrompt(_workdir, _file, _urlLine);
+        showResumePrompt(_workdir, _file, _urlLine, _urlChar);
     } else {
         const _lastFolder = localStorage.getItem('hotnote2-lastFolder');
         if (_lastFolder) {
             const _lastLine = parseInt(localStorage.getItem('hotnote2-lastLine') || '0', 10) || 0;
-            showResumePrompt(_lastFolder, localStorage.getItem('hotnote2-lastFile'), _lastLine);
+            const _lastChar = parseInt(localStorage.getItem('hotnote2-lastChar') || '0', 10) || 0;
+            showResumePrompt(_lastFolder, localStorage.getItem('hotnote2-lastFile'), _lastLine, _lastChar);
         }
     }
 
@@ -1992,10 +2013,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const banner = document.getElementById('resume-prompt');
         const filePath = banner?.dataset.file || '';
         const lineNum = parseInt(banner?.dataset.line || '0', 10) || 0;
+        const charNum = parseInt(banner?.dataset.char || '0', 10) || 0;
         dismissResumePrompt();
         await openFolder();
         if (filePath && state.rootHandle) {
-            await openFileByPath(state.rootHandle, filePath, lineNum);
+            await openFileByPath(state.rootHandle, filePath, lineNum, charNum);
         }
     });
     document.getElementById('resume-dismiss-btn')?.addEventListener('click', () => {
@@ -2004,6 +2026,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('hotnote2-lastFolder');
         localStorage.removeItem('hotnote2-lastFile');
         localStorage.removeItem('hotnote2-lastLine');
+        localStorage.removeItem('hotnote2-lastChar');
     });
 
     // Track cursor line for URL/localStorage sync
@@ -2012,6 +2035,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const editor = document.getElementById('source-editor');
         const pos = editor.selectionStart || 0;
         state.currentLine = (editor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+        const lastNewline = editor.value.lastIndexOf('\n', pos - 1);
+        state.currentChar = lastNewline === -1 ? pos + 1 : pos - lastNewline;
         clearTimeout(_lineDebounce);
         _lineDebounce = setTimeout(updateURL, 600);
     });
@@ -2019,6 +2044,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const editor = document.getElementById('source-editor');
         const pos = editor.selectionStart || 0;
         state.currentLine = (editor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+        const lastNewline = editor.value.lastIndexOf('\n', pos - 1);
+        state.currentChar = lastNewline === -1 ? pos + 1 : pos - lastNewline;
         clearTimeout(_lineDebounce);
         _lineDebounce = setTimeout(updateURL, 600);
     });
