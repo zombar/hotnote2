@@ -1646,6 +1646,50 @@ function toggleTheme() {
 }
 
 // =========================================================================
+// Update Notifications
+// =========================================================================
+
+const UPDATE_CHECK_KEY = 'hotnote2-known-sha';
+const UPDATE_POLL_MS   = 30 * 60 * 1000;
+
+function showUpdateBanner() {
+    const banner = document.getElementById('update-banner');
+    if (!banner || banner.style.display !== 'none') return;
+    dismissResumePrompt(); // update takes priority over resume prompt
+    banner.style.display = '';
+}
+
+function dismissUpdateBanner() {
+    const banner = document.getElementById('update-banner');
+    if (banner) banner.style.display = 'none';
+}
+
+async function checkForUpdate() {
+    try {
+        const res = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return;
+        const { sha } = await res.json();
+        if (!sha) return;
+        const known = localStorage.getItem(UPDATE_CHECK_KEY);
+        if (!known) { localStorage.setItem(UPDATE_CHECK_KEY, sha); return; }
+        if (sha !== known) showUpdateBanner();
+    } catch (_) {}
+}
+
+function initUpdateChecker() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', e => {
+            if (e.data?.type === 'APP_UPDATED') showUpdateBanner();
+        });
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') checkForUpdate();
+    });
+    setInterval(checkForUpdate, UPDATE_POLL_MS);
+    checkForUpdate();
+}
+
+// =========================================================================
 // Init
 // =========================================================================
 
@@ -1653,6 +1697,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Theme
     initTheme();
     document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+
+    // Update checker
+    initUpdateChecker();
+    document.getElementById('update-banner-reload')?.addEventListener('click', () => {
+        localStorage.removeItem(UPDATE_CHECK_KEY);
+        window.location.reload();
+    });
+    document.getElementById('update-banner-dismiss')?.addEventListener('click', async () => {
+        try {
+            const res = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' });
+            const { sha } = await res.json();
+            if (sha) localStorage.setItem(UPDATE_CHECK_KEY, sha);
+        } catch (_) {}
+        dismissUpdateBanner();
+    });
 
     // Open folder button
     document.getElementById('open-folder')?.addEventListener('click', openFolder);

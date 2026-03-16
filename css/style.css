@@ -1178,17 +1178,33 @@ main {
 
 }
 
-/* Resume prompt banner */
-#resume-prompt {
+/* Shared banner styles */
+#resume-prompt,
+#update-banner {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     padding: 0.4rem 1rem;
-    background: var(--accent-muted, #1f3a5f);
     border-bottom: 1px solid var(--border);
     font-size: 0.8125rem;
     flex-shrink: 0;
+}
+
+/* Resume prompt banner */
+#resume-prompt {
+    background: var(--accent-muted, #1f3a5f);
     color: #fff;
 }
 #resume-prompt span { flex: 1; }
 #resume-dismiss-btn { margin-left: calc(0.25rem - 0.75rem); }
+
+/* Update notification banner */
+#update-banner {
+    background: #1a3a1a;
+    color: #a8e6a8;
+}
+html[data-theme="light"] #update-banner {
+    background: #e6f4e6;
+    color: #1a4a1a;
+}
+#update-banner span { flex: 1; }
