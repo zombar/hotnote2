@@ -1256,7 +1256,7 @@ async function renderWelcomeScreen() {
             <ul class="welcome-features">
                 <li>Open any local folder with <b>Open Folder</b> above</li>
                 <li>Edit code, markdown and JSON — view images &amp; more</li>
-                <li>Markdown preview, JSON datasheet, and tree views</li>
+                <li>Markdown preview, JSON/CSV table view, and JSON tree view</li>
                 <li>Requires Chrome or Edge (File System Access API)</li>
             </ul>
         </div>
