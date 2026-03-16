@@ -1,0 +1,21 @@
+country,capital,population_m,area_km2,gdp_usd_bn,continent,un_member
+China,Beijing,1412,9596960,17963,Asia,true
+United States,Washington D.C.,331,9833520,25463,North America,true
+India,New Delhi,1380,3287263,3386,Asia,true
+Germany,Berlin,84,357114,4072,Europe,true
+Japan,Tokyo,125,377975,4231,Asia,true
+Brazil,Brasília,215,8515767,2081,South America,true
+United Kingdom,London,67,243610,3070,Europe,true
+France,Paris,68,551695,2782,Europe,true
+Canada,Ottawa,38,9984670,2140,North America,true
+Australia,Canberra,26,7692024,1693,Oceania,true
+South Korea,Seoul,52,100210,1665,Asia,true
+Italy,Rome,60,301340,2169,Europe,true
+Mexico,Mexico City,126,1964375,1323,North America,true
+Indonesia,Jakarta,273,1904569,1319,Asia,true
+Netherlands,Amsterdam,17,41543,1011,Europe,true
+Saudi Arabia,Riyadh,35,2149690,1062,Asia,true
+Turkey,Ankara,85,783562,906,Asia,true
+Switzerland,Bern,9,41285,800,Europe,true
+Argentina,Buenos Aires,45,2780400,641,South America,true
+Sweden,Stockholm,10,450295,586,Europe,true

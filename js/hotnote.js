@@ -738,15 +738,37 @@ function determineInitialMode(ext, content) {
         return;
     }
 
-    // JSON: treeview if valid, else source
-    if (ext === 'json') {
-        const jt = detectJsonType(content);
-        if (jt.isObject || jt.isArray) {
-            state.editorMode = 'treeview';
-            state.treeviewData = jt.parsed;
-            state.treeviewCollapsed = new Set();
+    // CSV: always datasheet
+    if (ext === 'csv') {
+        const ds = parseCSV(content);
+        if (ds.isDatasheet) {
+            state.editorMode = 'datasheet';
+            state.datasheetData = ds.data;
+            state.datasheetSchema = inferSchema(ds.data);
+            state.datasheetPage = 1;
         } else {
             state.editorMode = 'source';
+        }
+        return;
+    }
+
+    // JSON: datasheet if array-of-objects, treeview if valid, else source
+    if (ext === 'json') {
+        const ds = detectDatasheetMode(content);
+        if (ds.isDatasheet) {
+            state.editorMode = 'datasheet';
+            state.datasheetData = ds.data;
+            state.datasheetSchema = inferSchema(ds.data);
+            state.datasheetPage = 1;
+        } else {
+            const jt = detectJsonType(content);
+            if (jt.isObject || jt.isArray) {
+                state.editorMode = 'treeview';
+                state.treeviewData = jt.parsed;
+                state.treeviewCollapsed = new Set();
+            } else {
+                state.editorMode = 'source';
+            }
         }
         return;
     }
@@ -780,10 +802,14 @@ function updateModeToolbar() {
     const ext = getExtension(state.currentFilename);
     const isImage = IMAGE_EXTENSIONS.has(ext);
     const isJson = ext === 'json';
+    const isCsv = ext === 'csv';
     const isMd = ext === 'md';
 
-    const jt = isJson ? detectJsonType(document.getElementById('source-editor').value) : { isObject: false, isArray: false };
-    const hasTree = isJson && (jt.isObject || jt.isArray);
+    const content = (isJson || isCsv) ? document.getElementById('source-editor').value : '';
+    const jt = isJson ? detectJsonType(content) : { isObject: false, isArray: false };
+    const ds = isJson ? detectDatasheetMode(content) : isCsv ? parseCSV(content) : { isDatasheet: false };
+    const hasDatasheet = ds.isDatasheet;
+    const hasTree = isJson && !hasDatasheet && (jt.isObject || jt.isArray);
 
     const modeToolbar = document.getElementById('mode-toolbar');
 
@@ -795,12 +821,14 @@ function updateModeToolbar() {
     modeToolbar.innerHTML = `
         <button class="btn btn-sm${state.editorMode === 'source' ? ' active' : ''}" id="mode-source">Source</button>
         ${isMd ? `<button class="btn btn-sm${state.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg">Preview</button>` : ''}
+        ${hasDatasheet ? `<button class="btn btn-sm${state.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet">Table</button>` : ''}
         ${hasTree ? `<button class="btn btn-sm${state.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview">Tree</button>` : ''}
         <span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>
     `;
 
     document.getElementById('mode-source')?.addEventListener('click', () => switchToMode('source'));
     document.getElementById('mode-wysiwyg')?.addEventListener('click', () => switchToMode('wysiwyg'));
+    document.getElementById('mode-datasheet')?.addEventListener('click', () => switchToMode('datasheet'));
     document.getElementById('mode-treeview')?.addEventListener('click', () => switchToMode('treeview'));
 }
 
@@ -1085,6 +1113,7 @@ function _scrollElForMode(mode) {
     if (mode === 'source') return document.getElementById('source-editor');
     if (mode === 'wysiwyg') return document.getElementById('wysiwyg');
     if (mode === 'treeview') return document.getElementById('s3-treeview');
+    if (mode === 'datasheet') return document.getElementById('s3-datasheet');
     if (mode === 'image') return document.getElementById('image-viewer');
     return null;
 }
@@ -1131,6 +1160,19 @@ function switchToMode(mode, content) {
             resolveLocalImages(wysiwyg).catch(console.error);
             applySyntaxHighlighting(wysiwyg);
             break;
+
+        case 'datasheet': {
+            const ext = getExtension(state.currentFilename);
+            const ds = ext === 'csv' ? parseCSV(currentContent) : detectDatasheetMode(currentContent);
+            if (ds.isDatasheet) {
+                state.datasheetData = ds.data;
+                state.datasheetSchema = inferSchema(ds.data);
+                state.datasheetPage = 1;
+            }
+            datasheet.style.display = 'flex';
+            _renderDatasheet();
+            break;
+        }
 
         case 'treeview': {
             const jt = detectJsonType(currentContent);
@@ -1213,8 +1255,8 @@ async function renderWelcomeScreen() {
             No backend. No build step. Files stay on your machine.</p>
             <ul class="welcome-features">
                 <li>Open any local folder with <b>Open Folder</b> above</li>
-                <li>Edit code, markdown, JSON, images &amp; more</li>
-                <li>Markdown preview, JSON datasheet, and tree views</li>
+                <li>Edit code, markdown and JSON — view images &amp; more</li>
+                <li>Markdown preview, JSON/CSV table view, and JSON tree view</li>
                 <li>Requires Chrome or Edge (File System Access API)</li>
             </ul>
         </div>
@@ -1359,6 +1401,54 @@ function detectDatasheetMode(content) {
     } catch (_e) {
         return { isDatasheet: false, data: null };
     }
+}
+
+function parseCSV(content) {
+    const rows = [];
+    let i = 0;
+    const n = content.length;
+
+    while (i < n) {
+        const row = [];
+        while (i < n) {
+            if (content[i] === '"') {
+                i++;
+                let field = '';
+                while (i < n) {
+                    if (content[i] === '"') {
+                        if (i + 1 < n && content[i + 1] === '"') { field += '"'; i += 2; }
+                        else { i++; break; }
+                    } else { field += content[i++]; }
+                }
+                row.push(field);
+            } else {
+                let field = '';
+                while (i < n && content[i] !== ',' && content[i] !== '\n' && content[i] !== '\r') {
+                    field += content[i++];
+                }
+                row.push(field.trim());
+            }
+            if (i < n && content[i] === ',') { i++; continue; }
+            break;
+        }
+        if (i < n && content[i] === '\r') i++;
+        if (i < n && content[i] === '\n') i++;
+        if (row.length > 0 && !(row.length === 1 && row[0] === '')) rows.push(row);
+    }
+
+    if (rows.length < 2) return { isDatasheet: false, data: null };
+
+    const headers = rows[0];
+    const data = rows.slice(1).map((row) => {
+        const obj = {};
+        headers.forEach((h, idx) => {
+            const val = row[idx] ?? '';
+            obj[h] = val !== '' && val.trim() !== '' && !isNaN(val) ? Number(val) : val;
+        });
+        return obj;
+    });
+
+    return { isDatasheet: true, data };
 }
 
 function inferSchema(data) {
