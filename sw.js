@@ -1,4 +1,4 @@
-const CACHE = 'hotnote-000000';  // replaced by GitHub Action on each push
+const CACHE = 'hotnote-8a8695b';
 const SHELL = ['/', '/index.html', '/manifest.json', '/icon-512.png',
                '/css/style.css', '/js/hotnote.js', '/js/lib-markdown.js', '/js/lib-format.js'];
 

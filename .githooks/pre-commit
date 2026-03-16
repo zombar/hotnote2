@@ -1,0 +1,6 @@
+#!/bin/sh
+SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+TS=$(node -e "process.stdout.write(String(Date.now()))" 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))" 2>/dev/null || echo "0")
+printf '{"sha":"%s","ts":%s}\n' "$SHA" "$TS" > version.json
+sed -i.bak "s/^const CACHE = .*/const CACHE = 'hotnote-${SHA}';/" sw.js && rm -f sw.js.bak
+git add version.json sw.js
