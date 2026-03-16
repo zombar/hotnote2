@@ -650,6 +650,9 @@ async function openFile(fileHandle, filename, pushHistory = true) {
             if (sourceEditor) {
                 sourceEditor.selectionStart = _cachedPos.cursorStart;
                 sourceEditor.selectionEnd   = _cachedPos.cursorEnd;
+                const pos = _cachedPos.cursorStart;
+                state.currentLine = (sourceEditor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+                updateURL();
             }
         }, 0);
     }
