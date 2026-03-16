@@ -1215,13 +1215,20 @@ html[data-theme="light"] #update-banner {
 .welcome-screen {
     flex: 1;
     overflow: auto;
-    padding: 2.5rem max(2rem, calc((100% - 68ch) / 2));
+    padding-top: 15vh;
+    padding-bottom: 2.5rem;
+    padding-left: max(2rem, calc((100% - 68ch) / 2));
+    padding-right: max(2rem, calc((100% - 68ch) / 2));
     display: flex;
     flex-direction: column;
     gap: 2rem;
     color: var(--color-text-primary);
     font-size: 0.9375rem;
     line-height: 1.6;
+    transition: padding-top 0.35s ease;
+}
+.welcome-screen.cl-open {
+    padding-top: 2.5rem;
 }
 
 .welcome-title {

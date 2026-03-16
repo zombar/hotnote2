@@ -1209,7 +1209,6 @@ async function renderWelcomeScreen() {
     el.className = 'welcome-screen';
     el.innerHTML = `
         <div class="welcome-hero">
-            <h1 class="welcome-title">hotnote</h1>
             <p class="welcome-tagline">Local-first code &amp; markdown editor.<br>
             No backend. No build step. Files stay on your machine.</p>
             <ul class="welcome-features">
@@ -1227,6 +1226,10 @@ async function renderWelcomeScreen() {
         </details>`;
 
     editorArea.appendChild(el);
+
+    el.querySelector('.cl-details').addEventListener('toggle', function () {
+        el.classList.toggle('cl-open', this.open);
+    });
 
     try {
         const res = await fetch(
