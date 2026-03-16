@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.0] — 2026-03-16
+### Added
+- JSON array-of-objects files now open automatically in Table (datasheet) view
+- CSV file support: opens in Table view with RFC 4180 parsing (quoted fields, embedded commas/newlines, numeric coercion)
+- "Table" toolbar button for JSON and CSV files; switch freely between Source and Table
+- `examples/` folder with sample files: markdown reference, JSON table, JSON tree data, and CSV
+
+### Fixed
+- Table view panel rendered with wrong display mode (`block` instead of `flex`), causing layout overflow
+- Welcome screen incorrectly stated images could be edited — corrected to "view"
+
 ## [0.4.0] — 2026-03-16
 ### Added
 - Session restore: reopens last folder/file on load via URL params or localStorage
