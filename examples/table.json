@@ -1,0 +1,14 @@
+[
+  { "name": "Alice Nguyen",    "role": "Engineer",   "team": "Platform",  "level": "Senior", "yoe": 7,  "remote": true,  "joined": "2019-03-12T00:00:00Z" },
+  { "name": "Bob Okafor",      "role": "Designer",   "team": "Product",   "level": "Mid",    "yoe": 4,  "remote": false, "joined": "2021-07-01T00:00:00Z" },
+  { "name": "Clara Svensson",  "role": "Engineer",   "team": "Platform",  "level": "Junior", "yoe": 1,  "remote": true,  "joined": "2024-01-15T00:00:00Z" },
+  { "name": "David Park",      "role": "Manager",    "team": "Product",   "level": "Senior", "yoe": 12, "remote": false, "joined": "2017-09-20T00:00:00Z" },
+  { "name": "Eva Müller",      "role": "Engineer",   "team": "Security",  "level": "Senior", "yoe": 9,  "remote": true,  "joined": "2018-05-03T00:00:00Z" },
+  { "name": "Frank Irizarry",  "role": "Analyst",    "team": "Data",      "level": "Mid",    "yoe": 5,  "remote": true,  "joined": "2020-11-08T00:00:00Z" },
+  { "name": "Grace Kowalski",  "role": "Engineer",   "team": "Data",      "level": "Mid",    "yoe": 3,  "remote": false, "joined": "2022-04-19T00:00:00Z" },
+  { "name": "Hiro Tanaka",     "role": "Designer",   "team": "Product",   "level": "Senior", "yoe": 8,  "remote": true,  "joined": "2019-08-27T00:00:00Z" },
+  { "name": "Isabel Santos",   "role": "Engineer",   "team": "Security",  "level": "Junior", "yoe": 2,  "remote": false, "joined": "2023-06-05T00:00:00Z" },
+  { "name": "James Osei",      "role": "Manager",    "team": "Platform",  "level": "Senior", "yoe": 14, "remote": true,  "joined": "2015-02-14T00:00:00Z" },
+  { "name": "Kira Patel",      "role": "Analyst",    "team": "Data",      "level": "Senior", "yoe": 10, "remote": true,  "joined": "2017-12-01T00:00:00Z" },
+  { "name": "Leo Fernandez",   "role": "Engineer",   "team": "Platform",  "level": "Mid",    "yoe": 4,  "remote": false, "joined": "2021-03-22T00:00:00Z" }
+]

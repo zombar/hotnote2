@@ -1,0 +1,32 @@
+{
+  "app": {
+    "name": "hotnote",
+    "version": "0.4.0",
+    "description": "Local-first code & markdown editor",
+    "license": "MIT"
+  },
+  "features": [
+    "File System Access API",
+    "Markdown preview",
+    "JSON table view",
+    "JSON tree view",
+    "CSV table view",
+    "Image viewer",
+    "Syntax highlighting",
+    "Autosave",
+    "PWA / offline"
+  ],
+  "modes": {
+    "source":    { "extensions": ["*"],               "description": "Raw text editor with line numbers" },
+    "wysiwyg":   { "extensions": ["md"],              "description": "Rendered markdown preview" },
+    "datasheet": { "extensions": ["json", "csv"],     "description": "Tabular data viewer with sorting and pagination" },
+    "treeview":  { "extensions": ["json"],            "description": "Collapsible JSON tree" },
+    "image":     { "extensions": ["png","jpg","svg"], "description": "Inline image viewer" }
+  },
+  "stats": {
+    "linesOfCode": 2900,
+    "files": 5,
+    "buildStep": false,
+    "dependencies": 0
+  }
+}
