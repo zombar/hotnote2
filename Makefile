@@ -1,6 +1,6 @@
 PORT ?= 8080
 
-.PHONY: setup preview lint dupes
+.PHONY: setup preview lint dupes changelog
 
 setup:
 	npm install
@@ -13,8 +13,10 @@ lint:
 
 dupes:
 	node_modules/.bin/jscpd js/
-
 preview:
 	@echo "→ http://localhost:$(PORT)"
 	@open "http://localhost:$(PORT)" 2>/dev/null || xdg-open "http://localhost:$(PORT)" 2>/dev/null || true
 	python3 -m http.server $(PORT)
+
+changelog:
+	@bash scripts/gen-changelog.sh

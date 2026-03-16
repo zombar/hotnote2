@@ -1184,10 +1184,14 @@ function clearEditor() {
     toolbar.innerHTML = '';
 
     const editorArea = document.getElementById('editor-area');
-    if (!editorArea.querySelector('.empty-state')) {
+    editorArea.querySelector('.welcome-screen')?.remove();
+    editorArea.querySelector('.empty-state')?.remove();
+    if (state.rootHandle === null) {
+        renderWelcomeScreen();
+    } else {
         const emptyState = document.createElement('div');
         emptyState.className = 'empty-state';
-        emptyState.innerHTML = '<h2>No file open</h2><p>Use <b>Open Folder</b> to browse local files.</p>';
+        emptyState.innerHTML = '<h2>No file open</h2><p>Select a file from the sidebar.</p>';
         editorArea.appendChild(emptyState);
     }
 
@@ -1196,6 +1200,47 @@ function clearEditor() {
     const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
     if (autosaveCheckbox) autosaveCheckbox.disabled = true;
     if (autosaveToggleLabel) autosaveToggleLabel.style.opacity = '0.4';
+}
+
+async function renderWelcomeScreen() {
+    const editorArea = document.getElementById('editor-area');
+
+    const el = document.createElement('div');
+    el.className = 'welcome-screen';
+    el.innerHTML = `
+        <div class="welcome-hero">
+            <h1 class="welcome-title">hotnote</h1>
+            <p class="welcome-tagline">Local-first code &amp; markdown editor.<br>
+            No backend. No build step. Files stay on your machine.</p>
+            <ul class="welcome-features">
+                <li>Open any local folder with <b>Open Folder</b> above</li>
+                <li>Edit code, markdown, JSON, images &amp; more</li>
+                <li>Markdown preview, JSON datasheet, and tree views</li>
+                <li>Requires Chrome or Edge (File System Access API)</li>
+            </ul>
+        </div>
+        <details class="cl-details">
+            <summary class="cl-summary">Changelog</summary>
+            <div class="cl-body" id="cl-body-content">
+                <span class="cl-loading">Loading\u2026</span>
+            </div>
+        </details>`;
+
+    editorArea.appendChild(el);
+
+    try {
+        const res = await fetch(
+            'https://raw.githubusercontent.com/zombar/hotnote2/main/CHANGELOG.md'
+        );
+        if (res.ok) {
+            const md = await res.text();
+            const body = document.getElementById('cl-body-content');
+            if (body) body.innerHTML = TM.markdown.renderMarkdown(md);
+        }
+    } catch (_) {
+        const body = document.getElementById('cl-body-content');
+        if (body) body.innerHTML = '<em class="cl-loading">Changelog unavailable offline.</em>';
+    }
 }
 
 // =========================================================================
