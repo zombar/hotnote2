@@ -70,6 +70,7 @@ const state = {
     // File history for back/forward navigation
     fileHistory: [],       // [{handle, name}, …]
     fileHistoryIndex: -1,  // pointer into fileHistory; -1 = nothing open
+    filePositionCache: {},  // keyed by relPath (or name); last-known pos per file
     // Autosave
     autosaveEnabled: false,
     autosaveTimer: null,
@@ -592,6 +593,7 @@ async function openFile(fileHandle, filename, pushHistory = true) {
                         ...(scrollEl ? { [state.editorMode]: scrollEl.scrollTop } : {}),
                     },
                 };
+                state.filePositionCache[current.relPath || current.name] = current.pos;  // NEW
             }
             state.fileHistory = state.fileHistory.slice(0, state.fileHistoryIndex + 1);
             state.fileHistory.push({ handle: fileHandle, name: filename, relPath: state.currentRelativePath });
@@ -610,8 +612,10 @@ async function openFile(fileHandle, filename, pushHistory = true) {
         li.classList.toggle('active', li.querySelector('.name')?.textContent === filename);
     });
 
-    // Reset scroll positions for new file
-    state.scrollPositions = {};
+    // Restore cached positions if this file was visited before (sidebar path)
+    const _cacheKey = state.currentRelativePath || filename;
+    const _cachedPos = pushHistory ? (state.filePositionCache[_cacheKey] || null) : null;
+    state.scrollPositions = _cachedPos?.scrollPositions ? { ..._cachedPos.scrollPositions } : {};
 
     let content = '';
     if (isImageFile(filename)) {
@@ -638,6 +642,20 @@ async function openFile(fileHandle, filename, pushHistory = true) {
     const ext = getExtension(filename);
     determineInitialMode(ext, content);
     renderEditor(content, filename);
+
+    // Restore cursor for previously-visited file (sidebar open path only)
+    if (_cachedPos && _cachedPos.cursorStart !== undefined) {
+        setTimeout(() => {
+            const sourceEditor = document.getElementById('source-editor');
+            if (sourceEditor) {
+                sourceEditor.selectionStart = _cachedPos.cursorStart;
+                sourceEditor.selectionEnd   = _cachedPos.cursorEnd;
+                const pos = _cachedPos.cursorStart;
+                state.currentLine = (sourceEditor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+                updateURL();
+            }
+        }, 0);
+    }
 
     // Enable autosave controls
     const autosaveCheckbox = document.getElementById('autosave-checkbox');
@@ -686,6 +704,7 @@ async function navigateHistory(delta) {
                 ...(scrollEl ? { [state.editorMode]: scrollEl.scrollTop } : {}),
             },
         };
+        state.filePositionCache[curEntry.relPath || curEntry.name] = curEntry.pos;  // NEW
     }
 
     state.fileHistoryIndex = target;
