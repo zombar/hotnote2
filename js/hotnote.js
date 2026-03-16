@@ -738,15 +738,23 @@ function determineInitialMode(ext, content) {
         return;
     }
 
-    // JSON: treeview if valid, else source
+    // JSON: datasheet if array-of-objects, treeview if valid, else source
     if (ext === 'json') {
-        const jt = detectJsonType(content);
-        if (jt.isObject || jt.isArray) {
-            state.editorMode = 'treeview';
-            state.treeviewData = jt.parsed;
-            state.treeviewCollapsed = new Set();
+        const ds = detectDatasheetMode(content);
+        if (ds.isDatasheet) {
+            state.editorMode = 'datasheet';
+            state.datasheetData = ds.data;
+            state.datasheetSchema = inferSchema(ds.data);
+            state.datasheetPage = 1;
         } else {
-            state.editorMode = 'source';
+            const jt = detectJsonType(content);
+            if (jt.isObject || jt.isArray) {
+                state.editorMode = 'treeview';
+                state.treeviewData = jt.parsed;
+                state.treeviewCollapsed = new Set();
+            } else {
+                state.editorMode = 'source';
+            }
         }
         return;
     }
@@ -782,8 +790,11 @@ function updateModeToolbar() {
     const isJson = ext === 'json';
     const isMd = ext === 'md';
 
-    const jt = isJson ? detectJsonType(document.getElementById('source-editor').value) : { isObject: false, isArray: false };
-    const hasTree = isJson && (jt.isObject || jt.isArray);
+    const content = isJson ? document.getElementById('source-editor').value : '';
+    const jt = isJson ? detectJsonType(content) : { isObject: false, isArray: false };
+    const ds = isJson ? detectDatasheetMode(content) : { isDatasheet: false };
+    const hasDatasheet = ds.isDatasheet;
+    const hasTree = isJson && !hasDatasheet && (jt.isObject || jt.isArray);
 
     const modeToolbar = document.getElementById('mode-toolbar');
 
@@ -795,12 +806,14 @@ function updateModeToolbar() {
     modeToolbar.innerHTML = `
         <button class="btn btn-sm${state.editorMode === 'source' ? ' active' : ''}" id="mode-source">Source</button>
         ${isMd ? `<button class="btn btn-sm${state.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg">Preview</button>` : ''}
+        ${hasDatasheet ? `<button class="btn btn-sm${state.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet">Table</button>` : ''}
         ${hasTree ? `<button class="btn btn-sm${state.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview">Tree</button>` : ''}
         <span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>
     `;
 
     document.getElementById('mode-source')?.addEventListener('click', () => switchToMode('source'));
     document.getElementById('mode-wysiwyg')?.addEventListener('click', () => switchToMode('wysiwyg'));
+    document.getElementById('mode-datasheet')?.addEventListener('click', () => switchToMode('datasheet'));
     document.getElementById('mode-treeview')?.addEventListener('click', () => switchToMode('treeview'));
 }
 
@@ -1085,6 +1098,7 @@ function _scrollElForMode(mode) {
     if (mode === 'source') return document.getElementById('source-editor');
     if (mode === 'wysiwyg') return document.getElementById('wysiwyg');
     if (mode === 'treeview') return document.getElementById('s3-treeview');
+    if (mode === 'datasheet') return document.getElementById('s3-datasheet');
     if (mode === 'image') return document.getElementById('image-viewer');
     return null;
 }
@@ -1131,6 +1145,18 @@ function switchToMode(mode, content) {
             resolveLocalImages(wysiwyg).catch(console.error);
             applySyntaxHighlighting(wysiwyg);
             break;
+
+        case 'datasheet': {
+            const ds = detectDatasheetMode(currentContent);
+            if (ds.isDatasheet) {
+                state.datasheetData = ds.data;
+                state.datasheetSchema = inferSchema(ds.data);
+                state.datasheetPage = 1;
+            }
+            datasheet.style.display = 'block';
+            _renderDatasheet();
+            break;
+        }
 
         case 'treeview': {
             const jt = detectJsonType(currentContent);
