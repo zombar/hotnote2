@@ -1153,7 +1153,7 @@ function switchToMode(mode, content) {
                 state.datasheetSchema = inferSchema(ds.data);
                 state.datasheetPage = 1;
             }
-            datasheet.style.display = 'block';
+            datasheet.style.display = 'flex';
             _renderDatasheet();
             break;
         }
