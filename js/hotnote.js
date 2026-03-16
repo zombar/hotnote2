@@ -14,7 +14,7 @@ const TEXT_EXTENSIONS = new Set([
     'graphql', 'proto', 'tf', 'hcl', 'log', 'csv',
 ]);
 
-const CODE_EXTENSIONS = new Set([
+const _CODE_EXTENSIONS = new Set([
     'js', 'ts', 'jsx', 'tsx', 'go', 'py', 'rb', 'rs', 'css', 'scss',
     'html', 'htm', 'xml', 'sh', 'bash', 'zsh', 'yaml', 'yml',
     'toml', 'sql', 'graphql', 'proto', 'tf', 'hcl', 'conf', 'ini', 'cfg',
@@ -171,7 +171,7 @@ function getExtension(filename) {
     return parts[parts.length - 1].toLowerCase();
 }
 
-function isTextFile(filename) {
+function _isTextFile(filename) {
     const ext = getExtension(filename);
     const name = filename.toLowerCase();
     return TEXT_EXTENSIONS.has(ext) || name === 'dockerfile' || name === 'makefile' || name.startsWith('.');
@@ -185,7 +185,7 @@ function isUnopenable(entry) {
     if (entry.kind !== 'file') return false;
     if (IMAGE_EXTENSIONS.has(getExtension(entry.name))) return false; // images are viewable
     if (BINARY_EXTENSIONS.has(getExtension(entry.name))) return true;
-    if (entry.size != null && entry.size > MAX_OPENABLE_SIZE) return true;
+    if (entry.size !== null && entry.size !== undefined && entry.size > MAX_OPENABLE_SIZE) return true;
     return false;
 }
 
@@ -226,7 +226,7 @@ async function listDirectory(dirHandle) {
     // Fetch file sizes in parallel to determine openability
     const files = await Promise.all(fileHandles.map(async ({ name, handle }) => {
         let size = 0;
-        try { size = (await handle.getFile()).size; } catch (_) {}
+        try { size = (await handle.getFile()).size; } catch (_) { /* ignore */ }
         return { name, handle, kind: 'file', size };
     }));
     files.sort((a, b) => a.name.localeCompare(b.name));
@@ -244,7 +244,7 @@ async function createFolder(name) {
     return state.currentDirHandle.getDirectoryHandle(name, { create: true });
 }
 
-async function deleteEntry(name) {
+async function _deleteEntry(name) {
     if (!state.currentDirHandle) return;
     await state.currentDirHandle.removeEntry(name, { recursive: true });
 }
@@ -1260,7 +1260,7 @@ function initResizeHandle() {
 // JSON detection (from tunnelmesh s3explorer)
 // =========================================================================
 
-function shouldUseWysiwygMode(ext, content) {
+function _shouldUseWysiwygMode(ext, content) {
     if (ext !== 'md') return false;
     if (!content || content.trim().length === 0) return false;
     return true;
@@ -1301,7 +1301,7 @@ function inferSchema(data) {
     data.forEach((obj) => Object.keys(obj).forEach((k) => allKeys.add(k)));
 
     const columns = Array.from(allKeys).map((key) => {
-        const values = data.map((obj) => obj[key]).filter((v) => v != null);
+        const values = data.map((obj) => obj[key]).filter((v) => v !== null && v !== undefined);
         let type = 'string';
 
         if (values.length > 0) {
@@ -1353,7 +1353,7 @@ function calculateDatasheetPageSize() {
     return Math.max(DATASHEET_PAGE_SIZE, Math.floor(available / 36));
 }
 
-function renderDatasheet() {
+function _renderDatasheet() {
     const container = document.getElementById('s3-datasheet');
     if (!container || !state.datasheetData || !state.datasheetSchema) return;
 
@@ -1418,10 +1418,10 @@ function renderDatasheet() {
 
     // Pagination buttons
     document.getElementById('s3-ds-prev')?.addEventListener('click', () => {
-        if (state.datasheetPage > 1) { state.datasheetPage--; renderDatasheet(); }
+        if (state.datasheetPage > 1) { state.datasheetPage--; _renderDatasheet(); }
     });
     document.getElementById('s3-ds-next')?.addEventListener('click', () => {
-        if (state.datasheetPage < totalPages) { state.datasheetPage++; renderDatasheet(); }
+        if (state.datasheetPage < totalPages) { state.datasheetPage++; _renderDatasheet(); }
     });
 
     // Nested cell click handlers
@@ -1486,7 +1486,7 @@ function renderTreeView() {
 
 }
 
-function getValueAtPath(root, path) {
+function _getValueAtPath(root, path) {
     // path is like 'root.key[0].subkey'
     // Strip 'root.' prefix
     const clean = path.replace(/^root\.?/, '');
@@ -1673,7 +1673,7 @@ async function checkForUpdate() {
         const known = localStorage.getItem(UPDATE_CHECK_KEY);
         if (!known) { localStorage.setItem(UPDATE_CHECK_KEY, sha); return; }
         if (sha !== known) showUpdateBanner();
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
 }
 
 function initUpdateChecker() {
@@ -1709,7 +1709,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' });
             const { sha } = await res.json();
             if (sha) localStorage.setItem(UPDATE_CHECK_KEY, sha);
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
         dismissUpdateBanner();
     });
 
