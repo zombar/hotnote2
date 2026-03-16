@@ -1208,3 +1208,112 @@ html[data-theme="light"] #update-banner {
     color: #1a4a1a;
 }
 #update-banner span { flex: 1; }
+
+/* =====================================================================
+   Welcome Screen
+   ===================================================================== */
+.welcome-screen {
+    flex: 1;
+    overflow: auto;
+    padding-top: 15vh;
+    padding-bottom: 2.5rem;
+    padding-left: max(2rem, calc((100% - 68ch) / 2));
+    padding-right: max(2rem, calc((100% - 68ch) / 2));
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    color: var(--color-text-primary);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    transition: padding-top 0.35s ease;
+}
+.welcome-screen.cl-open {
+    padding-top: 2.5rem;
+}
+
+.welcome-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--tok-keyword);
+    margin: 0 0 0.5rem;
+}
+
+.welcome-tagline {
+    color: var(--color-text-secondary);
+    margin: 0 0 0.75rem;
+}
+
+.welcome-features {
+    margin: 0;
+    padding-left: 1.5rem;
+    color: var(--color-text-secondary);
+}
+.welcome-features li { margin: 0.3rem 0; }
+.welcome-features b  { color: var(--color-text-primary); font-weight: 600; }
+
+/* Changelog collapsible */
+.cl-details {
+    border: 1px solid var(--color-border-primary);
+    border-radius: 6px;
+    max-width: 68ch;
+}
+
+.cl-summary {
+    padding: 0.625rem 0.875rem;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    user-select: none;
+    list-style: none;
+    background: var(--color-bg-secondary);
+    border-radius: 6px;
+}
+.cl-summary::-webkit-details-marker { display: none; }
+.cl-summary::before {
+    content: '\25B6';
+    font-size: 0.6rem;
+    margin-right: 0.5rem;
+    display: inline-block;
+    transition: transform 0.15s;
+    color: var(--color-text-tertiary);
+}
+.cl-details[open] .cl-summary::before { transform: rotate(90deg); }
+.cl-details[open] .cl-summary { border-radius: 6px 6px 0 0; }
+
+.cl-body {
+    padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--color-border-secondary);
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    overflow: auto;
+    max-height: 60vh;
+}
+
+.cl-loading {
+    color: var(--color-text-tertiary);
+    font-style: italic;
+}
+
+/* Markdown headings + lists inside changelog body */
+.cl-body h2 {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 1rem 0 0.35rem;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px solid var(--color-border-secondary);
+}
+.cl-body h3 {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    margin: 0.6rem 0 0.2rem;
+}
+.cl-body ul {
+    margin: 0.2rem 0 0.2rem 1.25rem;
+    padding: 0;
+}
+.cl-body li { margin: 0.15rem 0; }
