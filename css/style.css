@@ -1255,7 +1255,6 @@ html[data-theme="light"] #update-banner {
 .cl-details {
     border: 1px solid var(--color-border-primary);
     border-radius: 6px;
-    background: var(--color-bg-secondary);
     max-width: 68ch;
 }
 
@@ -1269,6 +1268,8 @@ html[data-theme="light"] #update-banner {
     color: var(--color-text-secondary);
     user-select: none;
     list-style: none;
+    background: var(--color-bg-secondary);
+    border-radius: 6px;
 }
 .cl-summary::-webkit-details-marker { display: none; }
 .cl-summary::before {
@@ -1280,6 +1281,7 @@ html[data-theme="light"] #update-banner {
     color: var(--color-text-tertiary);
 }
 .cl-details[open] .cl-summary::before { transform: rotate(90deg); }
+.cl-details[open] .cl-summary { border-radius: 6px 6px 0 0; }
 
 .cl-body {
     padding: 1rem 1.25rem 1.25rem;
