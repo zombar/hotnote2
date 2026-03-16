@@ -1,0 +1,8 @@
+{
+    "minLines": 5,
+    "minTokens": 50,
+    "maxLines": 3000,
+    "threshold": 10,
+    "reporters": ["console"],
+    "ignore": ["node_modules/**", ".git/**"]
+}
