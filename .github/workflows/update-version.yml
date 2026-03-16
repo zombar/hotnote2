@@ -1,0 +1,27 @@
+name: Update version
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'version.json'
+      - 'sw.js'
+jobs:
+  stamp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write version.json and update sw.js cache name
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          TS=$(date +%s%3N)
+          printf '{"sha":"%s","ts":%s}\n' "$SHA" "$TS" > version.json
+          sed -i "s/^const CACHE = .*/const CACHE = 'hotnote-${SHA}';/" sw.js
+      - name: Commit back
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json sw.js
+          git diff --cached --quiet || git commit -m "chore: stamp version [skip ci]"
+          git push
