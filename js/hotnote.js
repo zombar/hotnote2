@@ -1255,7 +1255,7 @@ async function renderWelcomeScreen() {
             No backend. No build step. Files stay on your machine.</p>
             <ul class="welcome-features">
                 <li>Open any local folder with <b>Open Folder</b> above</li>
-                <li>Edit code, markdown, JSON, images &amp; more</li>
+                <li>Edit code, markdown and JSON — view images &amp; more</li>
                 <li>Markdown preview, JSON datasheet, and tree views</li>
                 <li>Requires Chrome or Edge (File System Access API)</li>
             </ul>
