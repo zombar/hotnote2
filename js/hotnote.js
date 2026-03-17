@@ -854,15 +854,14 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
 }
 
 function updateNavButtons() {
-    const activePs = getPaneState(state.activePaneId);
     const backBtn = document.getElementById('back-btn');
     const fwdBtn = document.getElementById('forward-btn');
-    if (backBtn) backBtn.disabled = activePs.fileHistoryIndex <= 0;
-    if (fwdBtn)  fwdBtn.disabled = activePs.fileHistoryIndex >= activePs.fileHistory.length - 1;
+    if (backBtn) backBtn.disabled = state.fileHistoryIndex <= 0;
+    if (fwdBtn)  fwdBtn.disabled = state.fileHistoryIndex >= state.fileHistory.length - 1;
 }
 
 async function navigateHistory(delta) {
-    const paneId = state.activePaneId;
+    const paneId = 'pane1';
     const ps = getPaneState(paneId);
     const target = ps.fileHistoryIndex + delta;
     if (target < 0 || target >= ps.fileHistory.length) return;
