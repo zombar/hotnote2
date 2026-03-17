@@ -96,22 +96,40 @@
                 <button class="btn btn-sm btn-icon" id="forward-btn" disabled title="Forward" aria-label="Forward">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
+                <button class="btn btn-sm btn-icon" id="split-pane-btn" title="Toggle split pane" aria-label="Toggle split pane">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                </button>
             </div>
             <ul id="file-list"></ul>
         </aside>
         <div id="resize-handle"></div>
-        <section id="editor-area">
-            <div id="mode-toolbar" style="display:none"></div>
-            <div id="source-editor-wrap">
-                <div id="line-numbers" aria-hidden="true"></div>
-                <pre id="source-highlight-backdrop" aria-hidden="true"><code id="source-highlight-code"></code></pre>
-                <textarea id="source-editor" spellcheck="false"></textarea>
-            </div>
-            <div id="wysiwyg" contenteditable="false"></div>
-            <div id="s3-datasheet" style="display:none"></div>
-            <div id="s3-treeview" style="display:none"></div>
-            <div id="image-viewer" style="display:none"></div>
-        </section>
+        <div id="editor-container">
+            <section class="pane" id="pane1">
+                <div id="mode-toolbar" style="display:none"></div>
+                <div id="source-editor-wrap">
+                    <div id="line-numbers" aria-hidden="true"></div>
+                    <pre id="source-highlight-backdrop" aria-hidden="true"><code id="source-highlight-code"></code></pre>
+                    <textarea id="source-editor" spellcheck="false"></textarea>
+                </div>
+                <div id="wysiwyg" contenteditable="false"></div>
+                <div id="s3-datasheet" style="display:none"></div>
+                <div id="s3-treeview" style="display:none"></div>
+                <div id="image-viewer" style="display:none"></div>
+            </section>
+            <div id="split-resize-handle" style="display:none"></div>
+            <section class="pane" id="pane2" style="display:none">
+                <div id="mode-toolbar-p2"></div>
+                <div id="source-editor-wrap-p2">
+                    <div id="line-numbers-p2" aria-hidden="true"></div>
+                    <pre id="source-highlight-backdrop-p2" aria-hidden="true"><code id="source-highlight-code-p2"></code></pre>
+                    <textarea id="source-editor-p2" spellcheck="false"></textarea>
+                </div>
+                <div id="wysiwyg-p2" contenteditable="false"></div>
+                <div id="s3-datasheet-p2" style="display:none"></div>
+                <div id="s3-treeview-p2" style="display:none"></div>
+                <div id="image-viewer-p2" style="display:none"></div>
+            </section>
+        </div>
     </main>
 </div>
 

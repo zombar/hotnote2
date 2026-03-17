@@ -136,7 +136,7 @@ html {
     outline-offset: 2px;
 }
 /* Wysiwyg handles its own focus */
-#wysiwyg:focus-visible { outline: none; }
+#wysiwyg:focus-visible, #wysiwyg-p2:focus-visible { outline: none; }
 
 html, body {
     height: 100%;
@@ -403,12 +403,12 @@ main {
     flex-shrink: 0;
 }
 
-.new-file-input-wrap {
+.new-file-input-wrap, .new-folder-input-wrap {
     padding: 0.25rem 0.75rem;
     border-bottom: 1px solid var(--color-border-primary);
 }
 
-.new-file-input-wrap input {
+.new-file-input-wrap input, .new-folder-input-wrap input {
     width: 100%;
     padding: 0.3rem 0.5rem;
     background: var(--color-bg-primary);
@@ -420,11 +420,20 @@ main {
     border-radius: var(--panel-border-radius);
 }
 
-.new-file-input-wrap input:focus {
+.new-file-input-wrap input:focus, .new-folder-input-wrap input:focus {
     border-color: var(--color-text-primary);
     outline: 2px solid var(--color-text-primary);
     outline-offset: 1px;
     box-shadow: 0 0 0 3px var(--focus-glow);
+}
+
+.input-target-hint {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--color-text-tertiary);
+    font-family: var(--font-mono);
+    padding: 0.1rem 0 0.1rem 0.2rem;
+    letter-spacing: 0.02em;
 }
 
 /* =====================================================================
@@ -445,9 +454,17 @@ main {
 }
 
 /* =====================================================================
-   Editor Area
+   Editor Container & Panes
    ===================================================================== */
-#editor-area {
+#editor-container {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.pane {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -455,7 +472,33 @@ main {
     overflow: hidden;
 }
 
-#mode-toolbar {
+.pane.focused {
+    outline: 1px solid var(--color-accent-blue);
+    outline-offset: -1px;
+}
+
+#split-resize-handle {
+    width: var(--resize-handle-width);
+    background: var(--color-border-primary);
+    cursor: col-resize;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.15s;
+}
+
+#split-resize-handle:hover,
+#split-resize-handle.dragging {
+    background: var(--color-accent-blue);
+}
+
+#split-pane-btn.active {
+    background: var(--color-bg-tertiary);
+    border-color: var(--color-border-primary);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-sm), var(--highlight-top), inset 0 -2px 0 var(--color-text-primary);
+}
+
+#mode-toolbar, #mode-toolbar-p2 {
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -468,7 +511,7 @@ main {
     z-index: 1;
 }
 
-#mode-toolbar .filename-display {
+#mode-toolbar .filename-display, #mode-toolbar-p2 .filename-display {
     margin-left: 0.5rem;
     font-family: var(--font-mono);
     font-size: 0.7rem;
@@ -499,7 +542,7 @@ main {
 }
 
 /* Source editor wrapper — takes flex-1 slot, hidden until source mode */
-#source-editor-wrap {
+#source-editor-wrap, #source-editor-wrap-p2 {
     flex: 1;
     position: relative;
     overflow: hidden;
@@ -508,7 +551,7 @@ main {
 }
 
 /* Line number gutter */
-#line-numbers {
+#line-numbers, #line-numbers-p2 {
     position: absolute;
     top: 0; left: 0; bottom: 0;
     width: 3.25rem;
@@ -528,7 +571,7 @@ main {
 }
 
 /* Syntax highlight backdrop — sits behind the transparent textarea */
-#source-highlight-backdrop {
+#source-highlight-backdrop, #source-highlight-backdrop-p2 {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     margin: 0;
@@ -544,7 +587,7 @@ main {
     color: var(--color-text-primary);
 }
 
-#source-highlight-backdrop code {
+#source-highlight-backdrop code, #source-highlight-backdrop-p2 code {
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
@@ -554,7 +597,7 @@ main {
 }
 
 /* Source editor textarea — transparent overlay on top of backdrop */
-#source-editor {
+#source-editor, #source-editor-p2 {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     width: 100%;
@@ -578,16 +621,16 @@ main {
 }
 
 /* Token colors for source editor backdrop */
-#source-highlight-backdrop .tok-keyword  { color: var(--tok-keyword); font-weight: 600; }
-#source-highlight-backdrop .tok-type     { color: var(--tok-type); }
-#source-highlight-backdrop .tok-string   { color: var(--tok-string); }
-#source-highlight-backdrop .tok-number   { color: var(--tok-number); }
-#source-highlight-backdrop .tok-comment  { color: var(--tok-comment); font-style: italic; }
-#source-highlight-backdrop .tok-builtin  { color: var(--tok-builtin); }
-#source-highlight-backdrop .tok-operator { color: var(--tok-operator); }
+#source-highlight-backdrop .tok-keyword,  #source-highlight-backdrop-p2 .tok-keyword  { color: var(--tok-keyword); font-weight: 600; }
+#source-highlight-backdrop .tok-type,     #source-highlight-backdrop-p2 .tok-type     { color: var(--tok-type); }
+#source-highlight-backdrop .tok-string,   #source-highlight-backdrop-p2 .tok-string   { color: var(--tok-string); }
+#source-highlight-backdrop .tok-number,   #source-highlight-backdrop-p2 .tok-number   { color: var(--tok-number); }
+#source-highlight-backdrop .tok-comment,  #source-highlight-backdrop-p2 .tok-comment  { color: var(--tok-comment); font-style: italic; }
+#source-highlight-backdrop .tok-builtin,  #source-highlight-backdrop-p2 .tok-builtin  { color: var(--tok-builtin); }
+#source-highlight-backdrop .tok-operator, #source-highlight-backdrop-p2 .tok-operator { color: var(--tok-operator); }
 
 /* WYSIWYG preview */
-#wysiwyg {
+#wysiwyg, #wysiwyg-p2 {
     flex: 1;
     overflow: auto;
     padding: 1rem 1.5rem;
@@ -596,7 +639,7 @@ main {
 }
 
 /* Datasheet */
-#s3-datasheet {
+#s3-datasheet, #s3-datasheet-p2 {
     flex: 1;
     display: none;
     flex-direction: column;
@@ -604,7 +647,7 @@ main {
 }
 
 /* Treeview */
-#s3-treeview {
+#s3-treeview, #s3-treeview-p2 {
     flex: 1;
     overflow: auto;
     padding: 1rem;
@@ -616,7 +659,7 @@ main {
 }
 
 /* Image viewer */
-#image-viewer {
+#image-viewer, #image-viewer-p2 {
     flex: 1;
     overflow: auto;
     background: var(--color-bg-primary);
@@ -626,7 +669,7 @@ main {
     padding: 2rem;
 }
 
-#image-viewer img {
+#image-viewer img, #image-viewer-p2 img {
     max-width: 100%;
     height: auto;
     display: block;
@@ -683,7 +726,7 @@ main {
 }
 
 /* Mode toolbar buttons — normal button style when active, bottom-edge accent only */
-#mode-toolbar .btn.active {
+#mode-toolbar .btn.active, #mode-toolbar-p2 .btn.active {
     background: var(--color-bg-tertiary);
     border-color: var(--color-border-primary);
     color: var(--color-text-primary);
@@ -788,7 +831,7 @@ main {
 }
 
 /* Constrain reading width and center — padding grows to center at ~72ch */
-#wysiwyg.s3-wysiwyg {
+#wysiwyg.s3-wysiwyg, #wysiwyg-p2.s3-wysiwyg {
     padding: 2rem max(2rem, calc((100% - 100ch) / 2));
 }
 

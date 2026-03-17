@@ -78,9 +78,47 @@ const state = {
     currentRelativePath: null,
     currentLine: 1,
     currentChar: 1,
+    // Split pane state
+    splitMode: false,
+    activePaneId: 'pane1',
+    // Pane 2 state (pane 1 uses the flat state fields above)
+    pane2: {
+        currentFileHandle: null,
+        currentFilename: '',
+        isDirty: false,
+        editorMode: 'source',
+        imageObjectUrl: null,
+        scrollPositions: {},
+        datasheetData: null,
+        datasheetSchema: null,
+        datasheetPage: 1,
+        datasheetPageSize: DATASHEET_PAGE_SIZE,
+        treeviewData: null,
+        treeviewCollapsed: new Set(),
+        fileHistory: [],
+        fileHistoryIndex: -1,
+        filePositionCache: {},
+        autosaveEnabled: false,
+        autosaveTimer: null,
+        currentRelativePath: null,
+        currentLine: 1,
+        currentChar: 1,
+    },
 };
 
 const dragState = { handle: null, parentHandle: null };
+
+// =========================================================================
+// Pane Helpers
+// =========================================================================
+
+function getPaneEl(baseId, paneId) {
+    return document.getElementById(paneId === 'pane1' ? baseId : baseId + '-p2');
+}
+
+function getPaneState(paneId) {
+    return paneId === 'pane1' ? state : state.pane2;
+}
 
 // =========================================================================
 // URL State Management
@@ -246,14 +284,16 @@ async function listDirectory(dirHandle) {
     return [...dirs, ...files];
 }
 
-async function createFile(name) {
-    if (!state.currentDirHandle) return null;
-    return state.currentDirHandle.getFileHandle(name, { create: true });
+async function createFile(name, dirHandle) {
+    const dh = dirHandle || state.currentDirHandle;
+    if (!dh) return null;
+    return dh.getFileHandle(name, { create: true });
 }
 
-async function createFolder(name) {
-    if (!state.currentDirHandle) return null;
-    return state.currentDirHandle.getDirectoryHandle(name, { create: true });
+async function createFolder(name, dirHandle) {
+    const dh = dirHandle || state.currentDirHandle;
+    if (!dh) return null;
+    return dh.getDirectoryHandle(name, { create: true });
 }
 
 async function _deleteEntry(name) {
@@ -390,6 +430,10 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
         </div>`;
 
         const folderRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
+        // Store dir handle on the li for getTargetDir()
+        li._dirHandle = entry.handle;
+        li._dirRelPath = folderRelPath;
+
         li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
             if (e.target.closest('.delete-btn')) return;
             await toggleFolder(li, entry.handle, folderRelPath);
@@ -438,7 +482,7 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
             li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
                 if (e.target.closest('.delete-btn')) return;
                 state.currentRelativePath = fileRelPath;
-                await openFile(entry.handle, entry.name);
+                await openFile(entry.handle, entry.name, true, state.activePaneId);
             });
         }
     }
@@ -526,6 +570,56 @@ function getFileIconSvg(name, kind) {
 }
 
 // =========================================================================
+// Smart Target Folder
+// =========================================================================
+
+function getTargetDir() {
+    const expanded = [...document.querySelectorAll('#file-list .file-entry.expanded')];
+    if (expanded.length) {
+        const last = expanded[expanded.length - 1];
+        if (last._dirHandle) {
+            return { handle: last._dirHandle, relPath: last._dirRelPath || '', li: last };
+        }
+    }
+    return {
+        handle: state.currentDirHandle,
+        relPath: state.pathStack.slice(1).map(p => p.name).join('/'),
+        li: null,
+    };
+}
+
+async function refreshTargetFolder(li) {
+    if (!li || !li._dirHandle) {
+        await renderSidebar();
+        return;
+    }
+    // Re-populate just the folder's children without full sidebar refresh
+    const childUl = li.querySelector('.folder-children');
+    if (!childUl) {
+        // folder was collapsed — nothing to refresh
+        return;
+    }
+    let entries;
+    try {
+        entries = await listDirectory(li._dirHandle);
+    } catch (_err) {
+        await renderSidebar();
+        return;
+    }
+    childUl.innerHTML = '';
+    if (!entries.length) {
+        const emptyLi = document.createElement('li');
+        emptyLi.style.cssText = 'color:var(--color-text-tertiary);padding:0.2rem 0.75rem;font-size:0.75rem;font-style:italic';
+        emptyLi.textContent = 'Empty folder';
+        childUl.appendChild(emptyLi);
+    } else {
+        for (const child of entries) {
+            childUl.appendChild(renderFileEntry(child, li._dirHandle, li._dirRelPath || ''));
+        }
+    }
+}
+
+// =========================================================================
 // New File / Folder
 // =========================================================================
 
@@ -533,10 +627,14 @@ function showNewFileInput() {
     const existing = document.getElementById('new-file-input-wrap');
     if (existing) { existing.querySelector('input')?.focus(); return; }
 
+    const target = getTargetDir();
+
     const wrap = document.createElement('div');
     wrap.id = 'new-file-input-wrap';
     wrap.className = 'new-file-input-wrap';
-    wrap.innerHTML = '<input type="text" placeholder="filename.md" autocomplete="off">';
+
+    const hintText = target.li ? `in: ${target.li.querySelector('.name')?.textContent || target.relPath}` : '';
+    wrap.innerHTML = `<input type="text" placeholder="filename.md" autocomplete="off">${hintText ? `<span class="input-target-hint">${escapeHtml(hintText)}</span>` : ''}`;
 
     const toolbar = document.getElementById('sidebar-toolbar');
     toolbar.insertAdjacentElement('afterend', wrap);
@@ -550,11 +648,12 @@ function showNewFileInput() {
             if (!name) { wrap.remove(); return; }
             wrap.remove();
             try {
-                const dirs = state.pathStack.slice(1).map(p => p.name);
-                state.currentRelativePath = dirs.length ? dirs.join('/') + '/' + name : name;
-                const handle = await createFile(name);
-                await renderSidebar();
-                await openFile(handle, name);
+                const targetRelPath = target.relPath;
+                const dirs = targetRelPath ? [targetRelPath] : state.pathStack.slice(1).map(p => p.name);
+                state.currentRelativePath = dirs.length && dirs[0] ? dirs.join('/') + '/' + name : name;
+                const handle = await createFile(name, target.handle);
+                await refreshTargetFolder(target.li);
+                await openFile(handle, name, true, state.activePaneId);
             } catch (err) {
                 alert(`Failed to create file: ${err.message}`);
             }
@@ -568,76 +667,111 @@ function showNewFileInput() {
     });
 }
 
-async function showNewFolderInput() {
-    const name = prompt('Folder name:');
-    if (!name || !name.trim()) return;
-    try {
-        await createFolder(name.trim());
-        await renderSidebar();
-    } catch (err) {
-        alert(`Failed to create folder: ${err.message}`);
-    }
+function showNewFolderInput() {
+    const existing = document.getElementById('new-folder-input-wrap');
+    if (existing) { existing.querySelector('input')?.focus(); return; }
+
+    const target = getTargetDir();
+
+    const wrap = document.createElement('div');
+    wrap.id = 'new-folder-input-wrap';
+    wrap.className = 'new-folder-input-wrap';
+
+    const hintText = target.li ? `in: ${target.li.querySelector('.name')?.textContent || target.relPath}` : '';
+    wrap.innerHTML = `<input type="text" placeholder="folder-name" autocomplete="off">${hintText ? `<span class="input-target-hint">${escapeHtml(hintText)}</span>` : ''}`;
+
+    const toolbar = document.getElementById('sidebar-toolbar');
+    toolbar.insertAdjacentElement('afterend', wrap);
+
+    const input = wrap.querySelector('input');
+    input.focus();
+
+    input.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+            const name = input.value.trim();
+            if (!name) { wrap.remove(); return; }
+            wrap.remove();
+            try {
+                await createFolder(name, target.handle);
+                await refreshTargetFolder(target.li);
+            } catch (err) {
+                alert(`Failed to create folder: ${err.message}`);
+            }
+        } else if (e.key === 'Escape') {
+            wrap.remove();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => wrap.remove(), 150);
+    });
 }
 
 // =========================================================================
 // File Opening & Editor
 // =========================================================================
 
-async function openFile(fileHandle, filename, pushHistory = true) {
-    if (state.isDirty) {
+async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+
+    if (ps.isDirty) {
         if (!confirm('You have unsaved changes. Discard?')) return;
     }
 
     if (pushHistory) {
-        const current = state.fileHistory[state.fileHistoryIndex];
+        const current = ps.fileHistory[ps.fileHistoryIndex];
         if (!current || current.handle !== fileHandle) {
             // Save cursor/scroll of the file we're leaving
             if (current) {
-                const sourceEditor = document.getElementById('source-editor');
-                const scrollEl = _scrollElForMode(state.editorMode);
+                const sourceEditor = getPaneEl('source-editor', paneId);
+                const scrollEl = _scrollElForMode(ps.editorMode, paneId);
                 current.pos = {
-                    editorMode: state.editorMode,
+                    editorMode: ps.editorMode,
                     cursorStart: sourceEditor?.selectionStart ?? 0,
                     cursorEnd: sourceEditor?.selectionEnd ?? 0,
                     scrollPositions: {
-                        ...state.scrollPositions,
-                        ...(scrollEl ? { [state.editorMode]: scrollEl.scrollTop } : {}),
+                        ...ps.scrollPositions,
+                        ...(scrollEl ? { [ps.editorMode]: scrollEl.scrollTop } : {}),
                     },
                 };
-                state.filePositionCache[current.relPath || current.name] = current.pos;  // NEW
+                ps.filePositionCache[current.relPath || current.name] = current.pos;
             }
-            state.fileHistory = state.fileHistory.slice(0, state.fileHistoryIndex + 1);
-            state.fileHistory.push({ handle: fileHandle, name: filename, relPath: state.currentRelativePath });
-            state.fileHistoryIndex = state.fileHistory.length - 1;
+            ps.fileHistory = ps.fileHistory.slice(0, ps.fileHistoryIndex + 1);
+            const relPath = paneId === 'pane1' ? state.currentRelativePath : ps.currentRelativePath;
+            ps.fileHistory.push({ handle: fileHandle, name: filename, relPath });
+            ps.fileHistoryIndex = ps.fileHistory.length - 1;
         }
     }
 
-    state.currentFileHandle = fileHandle;
-    state.currentFilename = filename;
-    state.isDirty = false;
-    state.currentLine = 1;
-    state.currentChar = 1;
-    updateTitle();
+    ps.currentFileHandle = fileHandle;
+    ps.currentFilename = filename;
+    ps.isDirty = false;
+    ps.currentLine = 1;
+    ps.currentChar = 1;
+
+    if (paneId === 'pane1') {
+        updateTitle();
+    }
 
     // Update sidebar active state
     document.querySelectorAll('.file-entry').forEach(li => {
         li.classList.toggle('active', li.querySelector('.name')?.textContent === filename);
     });
 
-    // Restore cached positions if this file was visited before (sidebar path)
-    const _cacheKey = state.currentRelativePath || filename;
-    const _cachedPos = pushHistory ? (state.filePositionCache[_cacheKey] || null) : null;
-    state.scrollPositions = _cachedPos?.scrollPositions ? { ..._cachedPos.scrollPositions } : {};
+    // Restore cached positions if this file was visited before
+    const _cacheKey = (paneId === 'pane1' ? state.currentRelativePath : ps.currentRelativePath) || filename;
+    const _cachedPos = pushHistory ? (ps.filePositionCache[_cacheKey] || null) : null;
+    ps.scrollPositions = _cachedPos?.scrollPositions ? { ..._cachedPos.scrollPositions } : {};
 
     let content = '';
     if (isImageFile(filename)) {
-        if (state.imageObjectUrl) {
-            URL.revokeObjectURL(state.imageObjectUrl);
-            state.imageObjectUrl = null;
+        if (ps.imageObjectUrl) {
+            URL.revokeObjectURL(ps.imageObjectUrl);
+            ps.imageObjectUrl = null;
         }
         try {
             const file = await fileHandle.getFile();
-            state.imageObjectUrl = URL.createObjectURL(file);
+            ps.imageObjectUrl = URL.createObjectURL(file);
         } catch (err) {
             alert(`Failed to read image: ${err.message}`);
             return;
@@ -652,13 +786,33 @@ async function openFile(fileHandle, filename, pushHistory = true) {
     }
 
     const ext = getExtension(filename);
-    determineInitialMode(ext, content);
-    renderEditor(content, filename);
 
-    // Restore cursor for previously-visited file (sidebar open path only)
-    if (_cachedPos && _cachedPos.cursorStart !== undefined) {
+    // In split mode: when opening in pane1, force source mode in pane1 and open preview in pane2
+    if (state.splitMode && paneId === 'pane1') {
+        determineInitialMode(ext, content, ps);
+        const isPreviewable = ['md', 'json', 'csv'].includes(ext) || IMAGE_EXTENSIONS.has(ext);
+        if (isPreviewable) {
+            ps.editorMode = 'source';
+            renderEditor(content, filename, 'pane1');
+            // Mirror same file to pane2 in preview mode
+            state.pane2.currentFileHandle = fileHandle;
+            state.pane2.currentFilename = filename;
+            state.pane2.currentRelativePath = state.currentRelativePath;
+            determineInitialMode(ext, content, state.pane2);
+            // Force preview mode for pane2 (natural mode from determineInitialMode)
+            renderEditor(content, filename, 'pane2');
+        } else {
+            renderEditor(content, filename, 'pane1');
+        }
+    } else {
+        determineInitialMode(ext, content, ps);
+        renderEditor(content, filename, paneId);
+    }
+
+    // Restore cursor for previously-visited file (pane1 only for URL tracking)
+    if (paneId === 'pane1' && _cachedPos && _cachedPos.cursorStart !== undefined) {
         setTimeout(() => {
-            const sourceEditor = document.getElementById('source-editor');
+            const sourceEditor = getPaneEl('source-editor', 'pane1');
             if (sourceEditor) {
                 sourceEditor.selectionStart = _cachedPos.cursorStart;
                 sourceEditor.selectionEnd   = _cachedPos.cursorEnd;
@@ -671,89 +825,101 @@ async function openFile(fileHandle, filename, pushHistory = true) {
         }, 0);
     }
 
-    // Enable autosave controls
-    const autosaveCheckbox = document.getElementById('autosave-checkbox');
-    const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
-    if (autosaveCheckbox) {
-        autosaveCheckbox.disabled = false;
-        autosaveCheckbox.checked = state.autosaveEnabled;
+    // Enable autosave controls (reflect active pane)
+    if (paneId === state.activePaneId) {
+        const autosaveCheckbox = document.getElementById('autosave-checkbox');
+        const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
+        if (autosaveCheckbox) {
+            autosaveCheckbox.disabled = false;
+            autosaveCheckbox.checked = ps.autosaveEnabled;
+        }
+        if (autosaveToggleLabel) autosaveToggleLabel.style.opacity = '';
     }
-    if (autosaveToggleLabel) autosaveToggleLabel.style.opacity = '';
 
     // On narrow viewports, collapse sidebar after picking a file
     if (window.innerWidth <= 720) {
         document.getElementById('sidebar')?.classList.add('collapsed');
     }
 
-    updateURL();
+    if (paneId === 'pane1') {
+        updateURL();
+    }
     updateNavButtons();
 }
 
 function updateNavButtons() {
+    const activePs = getPaneState(state.activePaneId);
     const backBtn = document.getElementById('back-btn');
     const fwdBtn = document.getElementById('forward-btn');
-    if (backBtn) backBtn.disabled = state.fileHistoryIndex <= 0;
-    if (fwdBtn)  fwdBtn.disabled = state.fileHistoryIndex >= state.fileHistory.length - 1;
+    if (backBtn) backBtn.disabled = activePs.fileHistoryIndex <= 0;
+    if (fwdBtn)  fwdBtn.disabled = activePs.fileHistoryIndex >= activePs.fileHistory.length - 1;
 }
 
 async function navigateHistory(delta) {
-    const target = state.fileHistoryIndex + delta;
-    if (target < 0 || target >= state.fileHistory.length) return;
-    if (state.isDirty) {
+    const paneId = state.activePaneId;
+    const ps = getPaneState(paneId);
+    const target = ps.fileHistoryIndex + delta;
+    if (target < 0 || target >= ps.fileHistory.length) return;
+    if (ps.isDirty) {
         if (!confirm('You have unsaved changes. Discard?')) return;
-        state.isDirty = false;
+        ps.isDirty = false;
     }
 
     // Save cursor + scroll of current file before leaving
-    const curEntry = state.fileHistory[state.fileHistoryIndex];
+    const curEntry = ps.fileHistory[ps.fileHistoryIndex];
     if (curEntry) {
-        const sourceEditor = document.getElementById('source-editor');
-        const scrollEl = _scrollElForMode(state.editorMode);
+        const sourceEditor = getPaneEl('source-editor', paneId);
+        const scrollEl = _scrollElForMode(ps.editorMode, paneId);
         curEntry.pos = {
-            editorMode: state.editorMode,
+            editorMode: ps.editorMode,
             cursorStart: sourceEditor?.selectionStart ?? 0,
             cursorEnd: sourceEditor?.selectionEnd ?? 0,
             scrollPositions: {
-                ...state.scrollPositions,
-                ...(scrollEl ? { [state.editorMode]: scrollEl.scrollTop } : {}),
+                ...ps.scrollPositions,
+                ...(scrollEl ? { [ps.editorMode]: scrollEl.scrollTop } : {}),
             },
         };
-        state.filePositionCache[curEntry.relPath || curEntry.name] = curEntry.pos;  // NEW
+        ps.filePositionCache[curEntry.relPath || curEntry.name] = curEntry.pos;
     }
 
-    state.fileHistoryIndex = target;
-    const { handle, name, pos, relPath } = state.fileHistory[target];
-    state.currentRelativePath = relPath || null;
-    await openFile(handle, name, false);
+    ps.fileHistoryIndex = target;
+    const { handle, name, pos, relPath } = ps.fileHistory[target];
+    if (paneId === 'pane1') state.currentRelativePath = relPath || null;
+    else ps.currentRelativePath = relPath || null;
+    await openFile(handle, name, false, paneId);
 
     // Restore mode, cursor, and scroll for the target file
     if (pos) {
         if (pos.scrollPositions) {
-            state.scrollPositions = { ...pos.scrollPositions };
+            ps.scrollPositions = { ...pos.scrollPositions };
         }
-        if (pos.editorMode && pos.editorMode !== state.editorMode) {
-            switchToMode(pos.editorMode); // also restores scroll from state.scrollPositions
+        if (pos.editorMode && pos.editorMode !== ps.editorMode) {
+            switchToMode(pos.editorMode, paneId);
         } else {
-            const scrollEl = _scrollElForMode(state.editorMode);
-            if (scrollEl) scrollEl.scrollTop = (pos.scrollPositions?.[state.editorMode]) || 0;
+            const scrollEl = _scrollElForMode(ps.editorMode, paneId);
+            if (scrollEl) scrollEl.scrollTop = (pos.scrollPositions?.[ps.editorMode]) || 0;
         }
-        const sourceEditor = document.getElementById('source-editor');
+        const sourceEditor = getPaneEl('source-editor', paneId);
         if (sourceEditor && pos.cursorStart !== undefined) {
             sourceEditor.selectionStart = pos.cursorStart;
             sourceEditor.selectionEnd = pos.cursorEnd;
             const cursorPos = pos.cursorStart;
-            state.currentLine = (sourceEditor.value.substring(0, cursorPos).match(/\n/g) || []).length + 1;
-            const lastNl = sourceEditor.value.lastIndexOf('\n', cursorPos - 1);
-            state.currentChar = lastNl === -1 ? cursorPos + 1 : cursorPos - lastNl;
+            if (paneId === 'pane1') {
+                state.currentLine = (sourceEditor.value.substring(0, cursorPos).match(/\n/g) || []).length + 1;
+                const lastNl = sourceEditor.value.lastIndexOf('\n', cursorPos - 1);
+                state.currentChar = lastNl === -1 ? cursorPos + 1 : cursorPos - lastNl;
+            }
         }
     }
-    updateURL();
+    if (paneId === 'pane1') updateURL();
 }
 
-function determineInitialMode(ext, content) {
+function determineInitialMode(ext, content, paneState) {
+    const ps = paneState || state;
+
     // Image files
     if (IMAGE_EXTENSIONS.has(ext)) {
-        state.editorMode = 'image';
+        ps.editorMode = 'image';
         return;
     }
 
@@ -761,12 +927,12 @@ function determineInitialMode(ext, content) {
     if (ext === 'csv') {
         const ds = parseCSV(content);
         if (ds.isDatasheet) {
-            state.editorMode = 'datasheet';
-            state.datasheetData = ds.data;
-            state.datasheetSchema = inferSchema(ds.data);
-            state.datasheetPage = 1;
+            ps.editorMode = 'datasheet';
+            ps.datasheetData = ds.data;
+            ps.datasheetSchema = inferSchema(ds.data);
+            ps.datasheetPage = 1;
         } else {
-            state.editorMode = 'source';
+            ps.editorMode = 'source';
         }
         return;
     }
@@ -775,80 +941,84 @@ function determineInitialMode(ext, content) {
     if (ext === 'json') {
         const ds = detectDatasheetMode(content);
         if (ds.isDatasheet) {
-            state.editorMode = 'datasheet';
-            state.datasheetData = ds.data;
-            state.datasheetSchema = inferSchema(ds.data);
-            state.datasheetPage = 1;
+            ps.editorMode = 'datasheet';
+            ps.datasheetData = ds.data;
+            ps.datasheetSchema = inferSchema(ds.data);
+            ps.datasheetPage = 1;
         } else {
             const jt = detectJsonType(content);
             if (jt.isObject || jt.isArray) {
-                state.editorMode = 'treeview';
-                state.treeviewData = jt.parsed;
-                state.treeviewCollapsed = new Set();
+                ps.editorMode = 'treeview';
+                ps.treeviewData = jt.parsed;
+                ps.treeviewCollapsed = new Set();
             } else {
-                state.editorMode = 'source';
+                ps.editorMode = 'source';
             }
         }
         return;
     }
 
-    state.editorMode = 'source';
+    ps.editorMode = 'source';
 }
 
-function renderEditor(content, filename) {
-    const editorArea = document.getElementById('editor-area');
-    // Remove empty state if present
-    const emptyState = editorArea.querySelector('.empty-state');
-    if (emptyState) emptyState.remove();
+function renderEditor(content, filename, paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    const paneEl = document.getElementById(paneId);
+
+    // Remove empty state if present (pane1 only)
+    if (paneId === 'pane1') {
+        const emptyState = paneEl.querySelector('.empty-state');
+        if (emptyState) emptyState.remove();
+    }
 
     // Show mode toolbar
-    const toolbar = document.getElementById('mode-toolbar');
-    toolbar.style.display = 'flex';
-
-    // Update filename display
-    const filenameDisplay = document.getElementById('filename-display');
-    if (filenameDisplay) filenameDisplay.textContent = filename;
+    const toolbar = getPaneEl('mode-toolbar', paneId);
+    if (toolbar) toolbar.style.display = 'flex';
 
     // Set textarea content
-    const textarea = document.getElementById('source-editor');
-    textarea.value = content;
+    const textarea = getPaneEl('source-editor', paneId);
+    if (textarea) textarea.value = content;
 
-    updateModeToolbar();
-    switchToMode(state.editorMode, content);
+    updateModeToolbar(paneId);
+    switchToMode(ps.editorMode, paneId, content);
 }
 
-function updateModeToolbar() {
-    const ext = getExtension(state.currentFilename);
+function updateModeToolbar(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    const ext = getExtension(ps.currentFilename);
     const isImage = IMAGE_EXTENSIONS.has(ext);
     const isJson = ext === 'json';
     const isCsv = ext === 'csv';
     const isMd = ext === 'md';
 
-    const content = (isJson || isCsv) ? document.getElementById('source-editor').value : '';
+    const textarea = getPaneEl('source-editor', paneId);
+    const content = (isJson || isCsv) ? (textarea?.value || '') : '';
     const jt = isJson ? detectJsonType(content) : { isObject: false, isArray: false };
     const ds = isJson ? detectDatasheetMode(content) : isCsv ? parseCSV(content) : { isDatasheet: false };
     const hasDatasheet = ds.isDatasheet;
     const hasTree = isJson && !hasDatasheet && (jt.isObject || jt.isArray);
 
-    const modeToolbar = document.getElementById('mode-toolbar');
+    const modeToolbar = getPaneEl('mode-toolbar', paneId);
+    if (!modeToolbar) return;
 
     if (isImage) {
-        modeToolbar.innerHTML = `<span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>`;
+        modeToolbar.innerHTML = `<span id="filename-display${paneId === 'pane2' ? '-p2' : ''}" class="filename-display">${escapeHtml(ps.currentFilename)}</span>`;
         return;
     }
 
+    const sfx = paneId === 'pane2' ? '-p2' : '';
     modeToolbar.innerHTML = `
-        <button class="btn btn-sm${state.editorMode === 'source' ? ' active' : ''}" id="mode-source">Source</button>
-        ${isMd ? `<button class="btn btn-sm${state.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg">Preview</button>` : ''}
-        ${hasDatasheet ? `<button class="btn btn-sm${state.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet">Table</button>` : ''}
-        ${hasTree ? `<button class="btn btn-sm${state.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview">Tree</button>` : ''}
-        <span id="filename-display" class="filename-display">${escapeHtml(state.currentFilename)}</span>
+        <button class="btn btn-sm${ps.editorMode === 'source' ? ' active' : ''}" id="mode-source${sfx}">Source</button>
+        ${isMd ? `<button class="btn btn-sm${ps.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg${sfx}">Preview</button>` : ''}
+        ${hasDatasheet ? `<button class="btn btn-sm${ps.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet${sfx}">Table</button>` : ''}
+        ${hasTree ? `<button class="btn btn-sm${ps.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview${sfx}">Tree</button>` : ''}
+        <span id="filename-display${sfx}" class="filename-display">${escapeHtml(ps.currentFilename)}</span>
     `;
 
-    document.getElementById('mode-source')?.addEventListener('click', () => switchToMode('source'));
-    document.getElementById('mode-wysiwyg')?.addEventListener('click', () => switchToMode('wysiwyg'));
-    document.getElementById('mode-datasheet')?.addEventListener('click', () => switchToMode('datasheet'));
-    document.getElementById('mode-treeview')?.addEventListener('click', () => switchToMode('treeview'));
+    document.getElementById(`mode-source${sfx}`)?.addEventListener('click', () => switchToMode('source', paneId));
+    document.getElementById(`mode-wysiwyg${sfx}`)?.addEventListener('click', () => switchToMode('wysiwyg', paneId));
+    document.getElementById(`mode-datasheet${sfx}`)?.addEventListener('click', () => switchToMode('datasheet', paneId));
+    document.getElementById(`mode-treeview${sfx}`)?.addEventListener('click', () => switchToMode('treeview', paneId));
 }
 
 async function resolveLocalImages(container) {
@@ -1086,12 +1256,13 @@ function saveAutosavePref(enabled) {
     localStorage.setItem('hotnote2-autosave', String(enabled));
 }
 
-function startAutosaveTimer() {
-    if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
-    state.autosaveTimer = setTimeout(() => {
-        state.autosaveTimer = null;
-        if (state.isDirty && state.currentFileHandle && state.autosaveEnabled) {
-            saveFile(true);
+function startAutosaveTimer(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    if (ps.autosaveTimer) clearTimeout(ps.autosaveTimer);
+    ps.autosaveTimer = setTimeout(() => {
+        ps.autosaveTimer = null;
+        if (ps.isDirty && ps.currentFileHandle && ps.autosaveEnabled) {
+            saveFile(true, paneId);
         }
     }, 2000);
 }
@@ -1110,114 +1281,140 @@ function animateAutosaveLabel() {
     }, 1500);
 }
 
-function updateSourceHighlight() {
-    const codeEl = document.getElementById('source-highlight-code');
+function updateSourceHighlight(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    const codeEl = getPaneEl('source-highlight-code', paneId);
     if (!codeEl) return;
-    const textarea = document.getElementById('source-editor');
+    const textarea = getPaneEl('source-editor', paneId);
+    if (!textarea) return;
     const content = textarea.value;
-    const lang = getExtension(state.currentFilename);
+    const lang = getExtension(ps.currentFilename);
 
     // Trailing newline prevents last-line clipping
     codeEl.innerHTML = highlightCode(content + '\n', lang);
 
     // Update line numbers
-    const lineNumEl = document.getElementById('line-numbers');
+    const lineNumEl = getPaneEl('line-numbers', paneId);
     if (lineNumEl) {
         const lineCount = (content.match(/\n/g) || []).length + 1;
         lineNumEl.textContent = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
     }
 }
 
-function _scrollElForMode(mode) {
-    if (mode === 'source') return document.getElementById('source-editor');
-    if (mode === 'wysiwyg') return document.getElementById('wysiwyg');
-    if (mode === 'treeview') return document.getElementById('s3-treeview');
-    if (mode === 'datasheet') return document.getElementById('s3-datasheet');
-    if (mode === 'image') return document.getElementById('image-viewer');
+function _scrollElForMode(mode, paneId = 'pane1') {
+    if (mode === 'source') return getPaneEl('source-editor', paneId);
+    if (mode === 'wysiwyg') return getPaneEl('wysiwyg', paneId);
+    if (mode === 'treeview') return getPaneEl('s3-treeview', paneId);
+    if (mode === 'datasheet') return getPaneEl('s3-datasheet', paneId);
+    if (mode === 'image') return getPaneEl('image-viewer', paneId);
     return null;
 }
 
-function switchToMode(mode, content) {
+function switchToMode(mode, paneId = 'pane1', content) {
+    const ps = getPaneState(paneId);
+
     // Save scroll position of current panel before switching
-    const prevEl = _scrollElForMode(state.editorMode);
-    if (prevEl) state.scrollPositions[state.editorMode] = prevEl.scrollTop;
+    const prevEl = _scrollElForMode(ps.editorMode, paneId);
+    if (prevEl) ps.scrollPositions[ps.editorMode] = prevEl.scrollTop;
 
-    state.editorMode = mode;
+    ps.editorMode = mode;
 
-    const wrap = document.getElementById('source-editor-wrap');
-    const textarea = document.getElementById('source-editor');
-    const wysiwyg = document.getElementById('wysiwyg');
-    const datasheet = document.getElementById('s3-datasheet');
-    const treeview = document.getElementById('s3-treeview');
-    const imageViewer = document.getElementById('image-viewer');
+    const wrap = getPaneEl('source-editor-wrap', paneId);
+    const textarea = getPaneEl('source-editor', paneId);
+    const wysiwyg = getPaneEl('wysiwyg', paneId);
+    const datasheet = getPaneEl('s3-datasheet', paneId);
+    const treeview = getPaneEl('s3-treeview', paneId);
+    const imageViewer = getPaneEl('image-viewer', paneId);
 
     // Hide all panels
-    wrap.style.display = 'none';
-    wysiwyg.style.display = 'none';
-    datasheet.style.display = 'none';
-    treeview.style.display = 'none';
-    imageViewer.style.display = 'none';
+    if (wrap) wrap.style.display = 'none';
+    if (wysiwyg) wysiwyg.style.display = 'none';
+    if (datasheet) datasheet.style.display = 'none';
+    if (treeview) treeview.style.display = 'none';
+    if (imageViewer) imageViewer.style.display = 'none';
 
-    const currentContent = content !== undefined ? content : textarea.value;
+    const currentContent = content !== undefined ? content : (textarea ? textarea.value : '');
 
     switch (mode) {
         case 'source':
-            wrap.style.display = 'block';
-            updateSourceHighlight();
-            textarea.focus();
+            if (wrap) wrap.style.display = 'block';
+            updateSourceHighlight(paneId);
+            // Only auto-focus if this is the currently active pane
+            if (textarea && paneId === state.activePaneId) textarea.focus();
             break;
 
         case 'wysiwyg':
-            wysiwyg.style.display = 'block';
-            wysiwyg.className = 's3-wysiwyg';
-            wysiwyg.contentEditable = 'false';
-            if (TM && TM.markdown) {
-                wysiwyg.innerHTML = TM.markdown.renderMarkdown(currentContent);
-            } else {
-                wysiwyg.textContent = currentContent;
+            if (wysiwyg) {
+                wysiwyg.style.display = 'block';
+                wysiwyg.className = 's3-wysiwyg';
+                wysiwyg.contentEditable = 'false';
+                if (TM && TM.markdown) {
+                    wysiwyg.innerHTML = TM.markdown.renderMarkdown(currentContent);
+                } else {
+                    wysiwyg.textContent = currentContent;
+                }
+                resolveLocalImages(wysiwyg).catch(console.error);
+                applySyntaxHighlighting(wysiwyg);
+
+                // Wire up link clicks for this wysiwyg element (pane2 needs its own listener)
+                if (paneId === 'pane2') {
+                    wysiwyg.addEventListener('click', (e) => {
+                        const link = e.target.closest('a[href]');
+                        if (!link) return;
+                        e.preventDefault();
+                        const href = link.getAttribute('href');
+                        if (href && href !== '#') {
+                            window.open(href, '_blank', 'noopener,noreferrer');
+                        }
+                    }, { once: false });
+                }
             }
-            resolveLocalImages(wysiwyg).catch(console.error);
-            applySyntaxHighlighting(wysiwyg);
             break;
 
         case 'datasheet': {
-            const ext = getExtension(state.currentFilename);
+            const ext = getExtension(ps.currentFilename);
             const ds = ext === 'csv' ? parseCSV(currentContent) : detectDatasheetMode(currentContent);
             if (ds.isDatasheet) {
-                state.datasheetData = ds.data;
-                state.datasheetSchema = inferSchema(ds.data);
-                state.datasheetPage = 1;
+                ps.datasheetData = ds.data;
+                ps.datasheetSchema = inferSchema(ds.data);
+                ps.datasheetPage = 1;
             }
-            datasheet.style.display = 'flex';
-            _renderDatasheet();
+            if (datasheet) {
+                datasheet.style.display = 'flex';
+                _renderDatasheet(paneId);
+            }
             break;
         }
 
         case 'treeview': {
             const jt = detectJsonType(currentContent);
-            state.treeviewData = jt.parsed;
-            state.treeviewCollapsed = new Set();
-            treeview.style.display = 'block';
-            renderTreeView();
+            ps.treeviewData = jt.parsed;
+            ps.treeviewCollapsed = new Set();
+            if (treeview) {
+                treeview.style.display = 'block';
+                renderTreeView(paneId);
+            }
             break;
         }
 
         case 'image':
-            imageViewer.style.display = 'flex';
-            imageViewer.innerHTML = state.imageObjectUrl
-                ? `<img src="${state.imageObjectUrl}" alt="${escapeHtml(state.currentFilename)}">`
-                : `<p style="color:var(--color-text-tertiary)">Failed to load image</p>`;
+            if (imageViewer) {
+                imageViewer.style.display = 'flex';
+                imageViewer.innerHTML = ps.imageObjectUrl
+                    ? `<img src="${ps.imageObjectUrl}" alt="${escapeHtml(ps.currentFilename)}">`
+                    : `<p style="color:var(--color-text-tertiary)">Failed to load image</p>`;
+            }
             break;
-
     }
 
     // Restore scroll position for this mode (0 = top if not previously saved)
-    const newEl = _scrollElForMode(mode);
-    if (newEl) newEl.scrollTop = state.scrollPositions[mode] || 0;
+    const newEl = _scrollElForMode(mode, paneId);
+    if (newEl) newEl.scrollTop = ps.scrollPositions[mode] || 0;
 
     // Update toolbar buttons
-    document.querySelectorAll('#mode-toolbar .btn').forEach(btn => {
-        const btnMode = btn.id?.replace('mode-', '');
+    const toolbarId = paneId === 'pane1' ? 'mode-toolbar' : 'mode-toolbar-p2';
+    document.querySelectorAll(`#${toolbarId} .btn`).forEach(btn => {
+        const btnMode = btn.id?.replace('mode-', '').replace('-p2', '');
         btn.classList.toggle('active', btnMode === mode);
     });
 }
@@ -1236,24 +1433,25 @@ function clearEditor() {
     const treeview = document.getElementById('s3-treeview');
     const toolbar = document.getElementById('mode-toolbar');
 
-    wrap.style.display = 'none';
-    textarea.value = '';
-    wysiwyg.style.display = 'none';
-    datasheet.style.display = 'none';
-    treeview.style.display = 'none';
-    toolbar.style.display = 'none';
-    toolbar.innerHTML = '';
+    if (wrap) wrap.style.display = 'none';
+    if (textarea) textarea.value = '';
+    if (wysiwyg) wysiwyg.style.display = 'none';
+    if (datasheet) datasheet.style.display = 'none';
+    if (treeview) treeview.style.display = 'none';
+    if (toolbar) { toolbar.style.display = 'none'; toolbar.innerHTML = ''; }
 
-    const editorArea = document.getElementById('editor-area');
-    editorArea.querySelector('.welcome-screen')?.remove();
-    editorArea.querySelector('.empty-state')?.remove();
+    const pane1El = document.getElementById('pane1');
+    if (pane1El) {
+        pane1El.querySelector('.welcome-screen')?.remove();
+        pane1El.querySelector('.empty-state')?.remove();
+    }
     if (state.rootHandle === null) {
         renderWelcomeScreen();
     } else {
         const emptyState = document.createElement('div');
         emptyState.className = 'empty-state';
         emptyState.innerHTML = '<h2>No file open</h2><p>Select a file from the sidebar.</p>';
-        editorArea.appendChild(emptyState);
+        if (pane1El) pane1El.appendChild(emptyState);
     }
 
     // Disable autosave controls when no file is open
@@ -1264,7 +1462,8 @@ function clearEditor() {
 }
 
 async function renderWelcomeScreen() {
-    const editorArea = document.getElementById('editor-area');
+    const pane1El = document.getElementById('pane1');
+    if (!pane1El) return;
 
     const el = document.createElement('div');
     el.className = 'welcome-screen';
@@ -1286,7 +1485,7 @@ async function renderWelcomeScreen() {
             </div>
         </details>`;
 
-    editorArea.appendChild(el);
+    pane1El.appendChild(el);
 
     el.querySelector('.cl-details').addEventListener('toggle', function () {
         el.classList.toggle('cl-open', this.open);
@@ -1311,15 +1510,19 @@ async function renderWelcomeScreen() {
 // Save
 // =========================================================================
 
-async function saveFile(silent = false) {
-    if (!state.currentFileHandle) return;
-    const textarea = document.getElementById('source-editor');
+async function saveFile(silent = false, paneId = null) {
+    const pid = paneId || state.activePaneId;
+    const ps = getPaneState(pid);
+    if (!ps.currentFileHandle) return;
+    const textarea = getPaneEl('source-editor', pid);
     try {
-        await writeFile(state.currentFileHandle, textarea.value);
-        state.isDirty = false;
-        updateTitle();
-        const saveBtn = document.getElementById('save-btn');
-        if (saveBtn) { saveBtn.classList.remove('dirty'); saveBtn.disabled = true; }
+        await writeFile(ps.currentFileHandle, textarea ? textarea.value : '');
+        ps.isDirty = false;
+        if (pid === 'pane1') {
+            updateTitle();
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) { saveBtn.classList.remove('dirty'); saveBtn.disabled = true; }
+        }
         if (silent) animateAutosaveLabel();
     } catch (err) {
         if (!silent) alert(`Failed to save: ${err.message}`);
@@ -1327,20 +1530,149 @@ async function saveFile(silent = false) {
     }
 }
 
-function setDirty() {
-    if (!state.isDirty) {
-        state.isDirty = true;
-        updateTitle();
-        const saveBtn = document.getElementById('save-btn');
-        if (saveBtn) { saveBtn.classList.add('dirty'); saveBtn.disabled = false; }
+function setDirty(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    if (!ps.isDirty) {
+        ps.isDirty = true;
+        if (paneId === 'pane1') {
+            updateTitle();
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) { saveBtn.classList.add('dirty'); saveBtn.disabled = false; }
+        }
     }
-    startAutosaveTimer();
+    startAutosaveTimer(paneId);
 }
 
 function updateTitle() {
     const prefix = state.isDirty ? '• ' : '';
     const filename = state.currentFilename ? ` — ${state.currentFilename}` : '';
     document.title = `${prefix}hotnote${filename}`;
+}
+
+// =========================================================================
+// Split Pane
+// =========================================================================
+
+let _splitResizeInit = false;
+
+function toggleSplitPane() {
+    const btn = document.getElementById('split-pane-btn');
+    if (state.splitMode) {
+        // Close split pane
+        state.splitMode = false;
+        const pane2El = document.getElementById('pane2');
+        const splitHandle = document.getElementById('split-resize-handle');
+        if (pane2El) pane2El.style.display = 'none';
+        if (splitHandle) splitHandle.style.display = 'none';
+        if (btn) btn.classList.remove('active');
+        // Reset pane2 state
+        state.pane2.currentFileHandle = null;
+        state.pane2.currentFilename = '';
+        state.pane2.isDirty = false;
+        state.activePaneId = 'pane1';
+        updateFocusRing();
+    } else {
+        // Open split pane
+        state.splitMode = true;
+        const pane2El = document.getElementById('pane2');
+        const splitHandle = document.getElementById('split-resize-handle');
+        if (pane2El) pane2El.style.display = '';
+        if (splitHandle) splitHandle.style.display = '';
+        if (btn) btn.classList.add('active');
+
+        if (!_splitResizeInit) {
+            initSplitResizeHandle();
+            _splitResizeInit = true;
+        }
+
+        // Mirror pane1 content into pane2
+        const ps1 = state;
+        if (ps1.currentFileHandle && ps1.currentFilename) {
+            const ext = getExtension(ps1.currentFilename);
+            const textarea1 = document.getElementById('source-editor');
+            const content = textarea1 ? textarea1.value : '';
+
+            state.pane2.currentFileHandle = ps1.currentFileHandle;
+            state.pane2.currentFilename = ps1.currentFilename;
+            state.pane2.currentRelativePath = ps1.currentRelativePath;
+            state.pane2.autosaveEnabled = ps1.autosaveEnabled;
+
+            const isPreviewable = ['md', 'json', 'csv'].includes(ext) || IMAGE_EXTENSIONS.has(ext);
+            if (isPreviewable) {
+                // pane1 → source, pane2 → preview
+                ps1.editorMode = 'source';
+                renderEditor(content, ps1.currentFilename, 'pane1');
+                determineInitialMode(ext, content, state.pane2);
+                renderEditor(content, ps1.currentFilename, 'pane2');
+            } else {
+                // Both panes show source
+                state.pane2.editorMode = 'source';
+                renderEditor(content, ps1.currentFilename, 'pane2');
+            }
+        } else {
+            // Show empty state in pane2
+            const toolbar2 = document.getElementById('mode-toolbar-p2');
+            if (toolbar2) toolbar2.style.display = 'none';
+        }
+    }
+}
+
+function updateFocusRing() {
+    document.getElementById('pane1')?.classList.toggle('focused', state.activePaneId === 'pane1' && state.splitMode);
+    document.getElementById('pane2')?.classList.toggle('focused', state.activePaneId === 'pane2' && state.splitMode);
+}
+
+function initSplitResizeHandle() {
+    const handle = document.getElementById('split-resize-handle');
+    const pane1El = document.getElementById('pane1');
+    const pane2El = document.getElementById('pane2');
+    if (!handle || !pane1El || !pane2El) return;
+
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+        startX = e.clientX;
+        startWidth = pane1El.offsetWidth;
+        handle.classList.add('dragging');
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!handle.classList.contains('dragging')) return;
+        const container = document.getElementById('editor-container');
+        const containerWidth = container ? container.offsetWidth : window.innerWidth;
+        const minWidth = 200;
+        const maxWidth = containerWidth - 200;
+        const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + (e.clientX - startX)));
+        pane1El.style.flexBasis = `${newWidth}px`;
+        pane1El.style.flexGrow = '0';
+        pane1El.style.flexShrink = '0';
+        pane2El.style.flex = '1';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (handle.classList.contains('dragging')) {
+            handle.classList.remove('dragging');
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+        }
+    });
+}
+
+// Debounced sync preview for same-file sync
+let _syncPreviewTimer = null;
+function debouncedSyncPreview(paneId) {
+    clearTimeout(_syncPreviewTimer);
+    _syncPreviewTimer = setTimeout(() => {
+        const ps = getPaneState(paneId);
+        if (ps.editorMode !== 'source') {
+            const textarea = getPaneEl('source-editor', paneId);
+            const content = textarea ? textarea.value : '';
+            switchToMode(ps.editorMode, paneId, content);
+        }
+    }, 300);
 }
 
 // =========================================================================
@@ -1529,12 +1861,13 @@ function calculateDatasheetPageSize() {
     return Math.max(DATASHEET_PAGE_SIZE, Math.floor(available / 36));
 }
 
-function _renderDatasheet() {
-    const container = document.getElementById('s3-datasheet');
-    if (!container || !state.datasheetData || !state.datasheetSchema) return;
+function _renderDatasheet(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    const container = getPaneEl('s3-datasheet', paneId);
+    if (!container || !ps.datasheetData || !ps.datasheetSchema) return;
 
-    state.datasheetPageSize = calculateDatasheetPageSize();
-    const { datasheetData: data, datasheetSchema: schema, datasheetPage: page, datasheetPageSize: pageSize } = state;
+    ps.datasheetPageSize = calculateDatasheetPageSize();
+    const { datasheetData: data, datasheetSchema: schema, datasheetPage: page, datasheetPageSize: pageSize } = ps;
 
     const totalRows = data.length;
     const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -1542,30 +1875,31 @@ function _renderDatasheet() {
     const endRow = Math.min(startRow + pageSize, totalRows);
     const visibleRows = data.slice(startRow, endRow);
 
+    const sfx = paneId === 'pane2' ? '-p2' : '';
     container.innerHTML = `
         <div class="s3-datasheet-toolbar">
             <span class="s3-datasheet-info">
-                <span><b id="s3-ds-row-count">${totalRows}</b> rows</span>
-                <span><b id="s3-ds-col-count">${schema.columns.length}</b> cols</span>
+                <span><b id="s3-ds-row-count${sfx}">${totalRows}</b> rows</span>
+                <span><b id="s3-ds-col-count${sfx}">${schema.columns.length}</b> cols</span>
             </span>
-            <span>Page <b id="s3-ds-page-current">${page}</b> / <b id="s3-ds-page-total">${totalPages}</b></span>
+            <span>Page <b id="s3-ds-page-current${sfx}">${page}</b> / <b id="s3-ds-page-total${sfx}">${totalPages}</b></span>
         </div>
-        <div class="s3-datasheet-container" id="s3-datasheet-container">
-            <table class="s3-datasheet-table" id="s3-datasheet-table">
-                <thead id="s3-ds-thead"></thead>
-                <tbody id="s3-ds-tbody"></tbody>
-                <tfoot id="s3-ds-tfoot"></tfoot>
+        <div class="s3-datasheet-container" id="s3-datasheet-container${sfx}">
+            <table class="s3-datasheet-table" id="s3-datasheet-table${sfx}">
+                <thead id="s3-ds-thead${sfx}"></thead>
+                <tbody id="s3-ds-tbody${sfx}"></tbody>
+                <tfoot id="s3-ds-tfoot${sfx}"></tfoot>
             </table>
         </div>
         <div class="s3-datasheet-pagination">
-            <button class="btn btn-sm" id="s3-ds-prev" ${page === 1 ? 'disabled' : ''}>← Prev</button>
+            <button class="btn btn-sm" id="s3-ds-prev${sfx}" ${page === 1 ? 'disabled' : ''}>← Prev</button>
             <span>${startRow + 1}–${endRow} of ${totalRows}</span>
-            <button class="btn btn-sm" id="s3-ds-next" ${page >= totalPages ? 'disabled' : ''}>Next →</button>
+            <button class="btn btn-sm" id="s3-ds-next${sfx}" ${page >= totalPages ? 'disabled' : ''}>Next →</button>
         </div>
     `;
 
     // Render header
-    const thead = document.getElementById('s3-ds-thead');
+    const thead = document.getElementById(`s3-ds-thead${sfx}`);
     const headerRow = document.createElement('tr');
     schema.columns.forEach((col) => {
         const th = document.createElement('th');
@@ -1576,7 +1910,7 @@ function _renderDatasheet() {
     thead.appendChild(headerRow);
 
     // Render body
-    const tbody = document.getElementById('s3-ds-tbody');
+    const tbody = document.getElementById(`s3-ds-tbody${sfx}`);
     visibleRows.forEach((row, idx) => {
         const tr = document.createElement('tr');
         const actualRowIdx = startRow + idx;
@@ -1590,14 +1924,14 @@ function _renderDatasheet() {
     });
 
     // Render aggregations
-    renderAggregations();
+    renderAggregations(paneId);
 
     // Pagination buttons
-    document.getElementById('s3-ds-prev')?.addEventListener('click', () => {
-        if (state.datasheetPage > 1) { state.datasheetPage--; _renderDatasheet(); }
+    document.getElementById(`s3-ds-prev${sfx}`)?.addEventListener('click', () => {
+        if (ps.datasheetPage > 1) { ps.datasheetPage--; _renderDatasheet(paneId); }
     });
-    document.getElementById('s3-ds-next')?.addEventListener('click', () => {
-        if (state.datasheetPage < totalPages) { state.datasheetPage++; _renderDatasheet(); }
+    document.getElementById(`s3-ds-next${sfx}`)?.addEventListener('click', () => {
+        if (ps.datasheetPage < totalPages) { ps.datasheetPage++; _renderDatasheet(paneId); }
     });
 
     // Nested cell click handlers
@@ -1605,16 +1939,18 @@ function _renderDatasheet() {
         el.addEventListener('click', () => {
             const rowIdx = parseInt(el.dataset.rowIdx, 10);
             const colKey = el.dataset.colKey;
-            openNestedModal(rowIdx, colKey);
+            openNestedModal(rowIdx, colKey, paneId);
         });
     });
 }
 
-function renderAggregations() {
-    const tfoot = document.getElementById('s3-ds-tfoot');
-    if (!tfoot || !state.datasheetData || !state.datasheetSchema) return;
+function renderAggregations(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    const sfx = paneId === 'pane2' ? '-p2' : '';
+    const tfoot = document.getElementById(`s3-ds-tfoot${sfx}`);
+    if (!tfoot || !ps.datasheetData || !ps.datasheetSchema) return;
 
-    const { datasheetData: data, datasheetSchema: schema } = state;
+    const { datasheetData: data, datasheetSchema: schema } = ps;
     const tr = document.createElement('tr');
     tr.className = 's3-ds-agg-row';
 
@@ -1647,19 +1983,19 @@ function renderAggregations() {
 // Tree View (from tunnelmesh s3explorer)
 // =========================================================================
 
-function renderTreeView() {
-    const container = document.getElementById('s3-treeview');
-    if (!container || !state.treeviewData) return;
-    container.innerHTML = renderTreeNode(state.treeviewData, '', 'root');
+function renderTreeView(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    const container = getPaneEl('s3-treeview', paneId);
+    if (!container || !ps.treeviewData) return;
+    container.innerHTML = renderTreeNode(ps.treeviewData, '', 'root', paneId);
 
     // Attach toggle handlers
     container.querySelectorAll('.tree-toggle').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
-            toggleTreeNode(el.dataset.treePath);
+            toggleTreeNode(el.dataset.treePath, paneId);
         });
     });
-
 }
 
 function _getValueAtPath(root, path) {
@@ -1677,9 +2013,10 @@ function _getValueAtPath(root, path) {
     return current;
 }
 
-function renderTreeNode(value, path, key) {
+function renderTreeNode(value, path, key, paneId = 'pane1') {
+    const ps = getPaneState(paneId);
     const fullPath = path ? `${path}.${key}` : key;
-    const isCollapsed = state.treeviewCollapsed.has(fullPath);
+    const isCollapsed = ps.treeviewCollapsed.has(fullPath);
 
     if (value === null) {
         return `<div class="tree-item"><span class="tree-key">${escapeHtml(String(key))}:</span> <span class="tree-null">null</span></div>`;
@@ -1713,7 +2050,7 @@ function renderTreeNode(value, path, key) {
         if (!isCollapsed) {
             html += '<div class="tree-children">';
             value.forEach((item, index) => {
-                html += renderTreeNode(item, fullPath, `[${index}]`);
+                html += renderTreeNode(item, fullPath, `[${index}]`, paneId);
             });
             html += '</div>';
         }
@@ -1732,7 +2069,7 @@ function renderTreeNode(value, path, key) {
 
         if (!isCollapsed) {
             html += '<div class="tree-children">';
-            keys.forEach((k) => { html += renderTreeNode(value[k], fullPath, k); });
+            keys.forEach((k) => { html += renderTreeNode(value[k], fullPath, k, paneId); });
             html += '</div>';
         }
         return html;
@@ -1741,22 +2078,24 @@ function renderTreeNode(value, path, key) {
     return `<div class="tree-item"><span class="tree-key">${escapeHtml(String(key))}:</span> <span class="tree-unknown">${escapeHtml(String(value))}</span></div>`;
 }
 
-function toggleTreeNode(path) {
-    if (state.treeviewCollapsed.has(path)) {
-        state.treeviewCollapsed.delete(path);
+function toggleTreeNode(path, paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    if (ps.treeviewCollapsed.has(path)) {
+        ps.treeviewCollapsed.delete(path);
     } else {
-        state.treeviewCollapsed.add(path);
+        ps.treeviewCollapsed.add(path);
     }
-    renderTreeView();
+    renderTreeView(paneId);
 }
 
 // =========================================================================
 // Nested Data Modal
 // =========================================================================
 
-function openNestedModal(rowIdx, colKey) {
-    if (!state.datasheetData) return;
-    const row = state.datasheetData[rowIdx];
+function openNestedModal(rowIdx, colKey, paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    if (!ps.datasheetData) return;
+    const row = ps.datasheetData[rowIdx];
     if (!row || !(colKey in row)) return;
 
     const value = row[colKey];
@@ -1905,22 +2244,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Save button
     const saveBtn = document.getElementById('save-btn');
-    saveBtn?.addEventListener('click', saveFile);
+    saveBtn?.addEventListener('click', () => saveFile());
 
     // Sidebar toolbar buttons
     document.getElementById('new-file-btn')?.addEventListener('click', showNewFileInput);
     document.getElementById('new-folder-btn')?.addEventListener('click', showNewFolderInput);
     document.getElementById('back-btn')?.addEventListener('click', () => navigateHistory(-1));
     document.getElementById('forward-btn')?.addEventListener('click', () => navigateHistory(1));
+    document.getElementById('split-pane-btn')?.addEventListener('click', toggleSplitPane);
 
-    // Textarea dirty tracking + highlight sync
+    // Pane focus tracking
+    function setupPaneFocus(paneId) {
+        const paneEl = document.getElementById(paneId);
+        if (!paneEl) return;
+        paneEl.addEventListener('focusin', () => {
+            if (state.activePaneId !== paneId) {
+                state.activePaneId = paneId;
+                updateFocusRing();
+                updateNavButtons();
+                // Sync autosave checkbox to newly focused pane
+                const ps = getPaneState(paneId);
+                const autosaveCheckbox = document.getElementById('autosave-checkbox');
+                if (autosaveCheckbox) {
+                    autosaveCheckbox.checked = ps.autosaveEnabled;
+                    autosaveCheckbox.disabled = !ps.currentFileHandle;
+                }
+                const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
+                if (autosaveToggleLabel) {
+                    autosaveToggleLabel.style.opacity = ps.currentFileHandle ? '' : '0.4';
+                }
+            }
+        });
+        paneEl.addEventListener('mousedown', () => {
+            if (state.activePaneId !== paneId) {
+                state.activePaneId = paneId;
+                updateFocusRing();
+                updateNavButtons();
+            }
+        });
+    }
+    setupPaneFocus('pane1');
+    setupPaneFocus('pane2');
+
+    // Pane1 textarea dirty tracking + highlight sync
     const sourceEditor = document.getElementById('source-editor');
     sourceEditor?.addEventListener('input', () => {
-        setDirty();
-        updateSourceHighlight();
+        setDirty('pane1');
+        updateSourceHighlight('pane1');
+
+        // Same-file sync: if pane2 has the same file open, sync its content
+        if (state.splitMode && state.pane2.currentFilename === state.currentFilename) {
+            const textarea2 = document.getElementById('source-editor-p2');
+            if (textarea2) textarea2.value = sourceEditor.value;
+            debouncedSyncPreview('pane2');
+        }
     });
 
-    // Scroll sync: keep highlight backdrop and line numbers aligned with textarea
+    // Pane2 textarea dirty tracking + highlight sync
+    const sourceEditor2 = document.getElementById('source-editor-p2');
+    sourceEditor2?.addEventListener('input', () => {
+        setDirty('pane2');
+        updateSourceHighlight('pane2');
+
+        // Same-file sync: if pane1 has the same file open, sync its content
+        if (state.splitMode && state.currentFilename === state.pane2.currentFilename) {
+            const textarea1 = document.getElementById('source-editor');
+            if (textarea1) textarea1.value = sourceEditor2.value;
+            updateSourceHighlight('pane1');
+            debouncedSyncPreview('pane1');
+        }
+    });
+
+    // Scroll sync: keep highlight backdrop and line numbers aligned with pane1 textarea
     sourceEditor?.addEventListener('scroll', () => {
         const backdrop = document.getElementById('source-highlight-backdrop');
         const lineNums = document.getElementById('line-numbers');
@@ -1930,6 +2325,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (lineNums) {
             lineNums.scrollTop = sourceEditor.scrollTop;
+        }
+    });
+
+    // Scroll sync for pane2
+    sourceEditor2?.addEventListener('scroll', () => {
+        const backdrop2 = document.getElementById('source-highlight-backdrop-p2');
+        const lineNums2 = document.getElementById('line-numbers-p2');
+        if (backdrop2) {
+            backdrop2.scrollTop = sourceEditor2.scrollTop;
+            backdrop2.scrollLeft = sourceEditor2.scrollLeft;
+        }
+        if (lineNums2) {
+            lineNums2.scrollTop = sourceEditor2.scrollTop;
         }
     });
 
@@ -2029,22 +2437,20 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('hotnote2-lastChar');
     });
 
-    // Track cursor line for URL/localStorage sync
+    // Track cursor line for URL/localStorage sync (pane1 only)
     let _lineDebounce = null;
-    document.getElementById('source-editor')?.addEventListener('keyup', () => {
-        const editor = document.getElementById('source-editor');
-        const pos = editor.selectionStart || 0;
-        state.currentLine = (editor.value.substring(0, pos).match(/\n/g) || []).length + 1;
-        const lastNewline = editor.value.lastIndexOf('\n', pos - 1);
+    sourceEditor?.addEventListener('keyup', () => {
+        const pos = sourceEditor.selectionStart || 0;
+        state.currentLine = (sourceEditor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+        const lastNewline = sourceEditor.value.lastIndexOf('\n', pos - 1);
         state.currentChar = lastNewline === -1 ? pos + 1 : pos - lastNewline;
         clearTimeout(_lineDebounce);
         _lineDebounce = setTimeout(updateURL, 600);
     });
-    document.getElementById('source-editor')?.addEventListener('mouseup', () => {
-        const editor = document.getElementById('source-editor');
-        const pos = editor.selectionStart || 0;
-        state.currentLine = (editor.value.substring(0, pos).match(/\n/g) || []).length + 1;
-        const lastNewline = editor.value.lastIndexOf('\n', pos - 1);
+    sourceEditor?.addEventListener('mouseup', () => {
+        const pos = sourceEditor.selectionStart || 0;
+        state.currentLine = (sourceEditor.value.substring(0, pos).match(/\n/g) || []).length + 1;
+        const lastNewline = sourceEditor.value.lastIndexOf('\n', pos - 1);
         state.currentChar = lastNewline === -1 ? pos + 1 : pos - lastNewline;
         clearTimeout(_lineDebounce);
         _lineDebounce = setTimeout(updateURL, 600);
@@ -2052,11 +2458,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Autosave init
     state.autosaveEnabled = loadAutosavePref();
+    state.pane2.autosaveEnabled = state.autosaveEnabled;
     const autosaveCheckbox = document.getElementById('autosave-checkbox');
     const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
     if (autosaveCheckbox) {
         autosaveCheckbox.addEventListener('change', (e) => {
-            state.autosaveEnabled = e.target.checked;
+            const ps = getPaneState(state.activePaneId);
+            ps.autosaveEnabled = e.target.checked;
             saveAutosavePref(e.target.checked);
         });
     }

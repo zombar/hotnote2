@@ -1,3 +1,15 @@
+## [0.7.0] — 2026-03-17
+### Added
+- **Inline folder creation**: new folder button now shows an inline input (same UX as new file), replacing the old `prompt()` dialog
+- **Smart target folder**: new file/folder is created inside the last-expanded subfolder in the sidebar, preserving expanded tree state; a hint label shows the target path
+- **Split pane mode**: split button in the sidebar toolbar opens a second editor side-by-side
+  - Each pane has its own file, mode toolbar, history, save/autosave, and focus ring
+  - Sidebar file clicks open in the last-focused pane
+  - Opening a markdown/JSON/CSV file in split mode automatically puts pane 1 in source and pane 2 in preview
+  - Editing in pane 1 syncs content to pane 2 in real time when both panes show the same file
+  - URL and history track only pane 1; back/forward buttons operate on the active pane's history
+  - Draggable resize handle between panes
+
 ## [0.6.0] — 2026-03-16
 ### Added
 - URL now tracks cursor column (`&char=N`) alongside line number (`&line=N`)
