@@ -1193,24 +1193,6 @@ main {
 #autosave-label.hidden { display: none; }
 
 /* =====================================================================
-   Drag & Drop
-   ===================================================================== */
-.file-entry.dragging {
-    opacity: 0.35;
-}
-
-.file-entry.drag-over > .file-entry-row {
-    background: var(--color-bg-tertiary);
-    outline: 1px solid var(--color-text-secondary);
-    border-radius: var(--panel-border-radius);
-}
-
-#file-list.drag-over-list {
-    background: var(--color-bg-tertiary);
-    outline: 1px inset var(--color-border-primary);
-}
-
-/* =====================================================================
    Mobile
    ===================================================================== */
 @media (max-width: 720px) {

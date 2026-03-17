@@ -101,8 +101,6 @@ const state = {
     },
 };
 
-const dragState = { handle: null, parentHandle: null, relPath: null };
-
 // =========================================================================
 // Pane Helpers
 // =========================================================================
@@ -291,59 +289,6 @@ async function createFolder(name, dirHandle) {
     return dh.getDirectoryHandle(name, { create: true });
 }
 
-async function _deleteEntry(name) {
-    if (!state.currentDirHandle) return;
-    await state.currentDirHandle.removeEntry(name, { recursive: true });
-}
-
-async function copyDirInto(srcDir, destParent) {
-    const newDir = await destParent.getDirectoryHandle(srcDir.name, { create: true });
-    for await (const [, handle] of srcDir.entries()) {
-        if (handle.kind === 'file') {
-            const file = await handle.getFile();
-            const dh = await newDir.getFileHandle(handle.name, { create: true });
-            const w = await dh.createWritable();
-            await w.write(await file.arrayBuffer());
-            await w.close();
-        } else {
-            await copyDirInto(handle, newDir);
-        }
-    }
-}
-
-async function moveEntry(sourceParentHandle, entryHandle, destDirHandle) {
-    const name = entryHandle.name;
-    let copyDone = false;
-    try {
-        if (entryHandle.kind === 'file') {
-            const file = await entryHandle.getFile();
-            const dh = await destDirHandle.getFileHandle(name, { create: true });
-            const w = await dh.createWritable();
-            await w.write(await file.arrayBuffer());
-            await w.close();
-        } else {
-            await copyDirInto(entryHandle, destDirHandle);
-        }
-        copyDone = true;
-        // Use handle.remove() instead of sourceParentHandle.removeEntry() to avoid
-        // InvalidStateError: the parent handle's cached directory state may be stale
-        // (e.g. we just created a sibling folder), but the entry handle itself is not.
-        if (typeof entryHandle.remove === 'function') {
-            await entryHandle.remove(entryHandle.kind === 'directory' ? { recursive: true } : {});
-        } else {
-            await sourceParentHandle.removeEntry(name, { recursive: true });
-        }
-        if (entryHandle === state.currentFileHandle) clearEditor();
-    } catch (err) {
-        alert(copyDone
-            ? `Moved but source not deleted — please remove manually: ${err.message}`
-            : `Failed to move: ${err.message}`);
-    } finally {
-        // Always refresh sidebar so it reflects actual disk state, even after partial failure.
-        await renderSidebar();
-    }
-}
-
 // =========================================================================
 // Open Folder
 // =========================================================================
@@ -412,22 +357,6 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
         li.classList.add('active');
     }
 
-    li.setAttribute('draggable', 'true');
-    li.addEventListener('dragstart', (e) => {
-        dragState.handle = entry.handle;
-        dragState.parentHandle = parentHandle;
-        dragState.relPath = li._dirRelPath || li._relPath || null;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', entry.name);
-        requestAnimationFrame(() => li.classList.add('dragging'));
-    });
-    li.addEventListener('dragend', () => {
-        li.classList.remove('dragging');
-        dragState.relPath = null;
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        document.getElementById('file-list')?.classList.remove('drag-over-list');
-    });
-
     const icon = getFileIconSvg(entry.name, entry.kind);
     const deleteBtn = `<button class="delete-btn" title="Delete ${escapeHtml(entry.name)}" aria-label="Delete ${escapeHtml(entry.name)}">${DELETE_SVG}</button>`;
 
@@ -450,40 +379,7 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
             await toggleFolder(li, entry.handle, folderRelPath);
         });
 
-        li.addEventListener('dragover', (e) => {
-            if (!dragState.handle || dragState.handle === entry.handle) return;
-            // Only claim this drop when hovering directly over THIS folder, not nested content
-            if (e.target.closest('.file-entry') !== li) return;
-            // Prevent dropping a folder into itself or any of its descendants
-            if (dragState.handle.kind === 'directory' && dragState.relPath &&
-                (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) return;
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'move';
-            li.classList.add('drag-over');
-        });
-        li.addEventListener('dragleave', (e) => {
-            if (!li.contains(e.relatedTarget)) li.classList.remove('drag-over');
-        });
-        li.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            li.classList.remove('drag-over');
-            if (!dragState.handle || dragState.handle === entry.handle) return;
-            // Prevent circular move: dropping a folder into its own subtree
-            if (dragState.handle.kind === 'directory' && dragState.relPath &&
-                (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) {
-                dragState.handle = null;
-                dragState.parentHandle = null;
-                dragState.relPath = null;
-                return;
-            }
-            const { handle, parentHandle: srcParent } = dragState;
-            dragState.handle = null;
-            dragState.parentHandle = null;
-            dragState.relPath = null;
-            await moveEntry(srcParent, handle, entry.handle);
-        });
+
     } else {
         const unopenable = isUnopenable(entry);
         if (unopenable) li.classList.add('disabled');
@@ -2436,28 +2332,6 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             saveFile();
         }
-    });
-
-    // Drag-to-move: drop onto file-list background → move to current dir
-    const fileList = document.getElementById('file-list');
-    fileList?.addEventListener('dragover', (e) => {
-        if (!dragState.handle || dragState.parentHandle === state.currentDirHandle) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        fileList.classList.add('drag-over-list');
-    });
-    fileList?.addEventListener('dragleave', (e) => {
-        if (!fileList.contains(e.relatedTarget)) fileList.classList.remove('drag-over-list');
-    });
-    fileList?.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        fileList.classList.remove('drag-over-list');
-        if (!dragState.handle || dragState.parentHandle === state.currentDirHandle) return;
-        const { handle, parentHandle: srcParent } = dragState;
-        dragState.handle = null;
-        dragState.parentHandle = null;
-        dragState.relPath = null;
-        await moveEntry(srcParent, handle, state.currentDirHandle);
     });
 
     // Resize handle
