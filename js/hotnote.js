@@ -313,6 +313,7 @@ async function copyDirInto(srcDir, destParent) {
 
 async function moveEntry(sourceParentHandle, entryHandle, destDirHandle) {
     const name = entryHandle.name;
+    let copyDone = false;
     try {
         if (entryHandle.kind === 'file') {
             const file = await entryHandle.getFile();
@@ -323,11 +324,23 @@ async function moveEntry(sourceParentHandle, entryHandle, destDirHandle) {
         } else {
             await copyDirInto(entryHandle, destDirHandle);
         }
-        await sourceParentHandle.removeEntry(name, { recursive: true });
+        copyDone = true;
+        // Use handle.remove() instead of sourceParentHandle.removeEntry() to avoid
+        // InvalidStateError: the parent handle's cached directory state may be stale
+        // (e.g. we just created a sibling folder), but the entry handle itself is not.
+        if (typeof entryHandle.remove === 'function') {
+            await entryHandle.remove(entryHandle.kind === 'directory' ? { recursive: true } : {});
+        } else {
+            await sourceParentHandle.removeEntry(name, { recursive: true });
+        }
         if (entryHandle === state.currentFileHandle) clearEditor();
-        await renderSidebar();
     } catch (err) {
-        alert(`Failed to move: ${err.message}`);
+        alert(copyDone
+            ? `Moved but source not deleted — please remove manually: ${err.message}`
+            : `Failed to move: ${err.message}`);
+    } finally {
+        // Always refresh sidebar so it reflects actual disk state, even after partial failure.
+        await renderSidebar();
     }
 }
 

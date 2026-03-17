@@ -5,6 +5,8 @@
 - **Memory leaks**: `URL.revokeObjectURL` now called when clearing pane1 (on file delete) and when closing the split pane, preventing orphaned blob URLs for image files
 - **Autosave timer leak**: pending autosave timer for pane2 is now cancelled when closing the split pane
 - **Folder loop nesting**: removed "deepest expanded folder" fallback from `getTargetDir()`; it caused runaway nesting (`examples/test/examples/test/…`) when the current file's parent wasn't visible in the sidebar, or when no file was open. Now always falls back to the root of the current directory view
+- **Drag-move stale handle error**: `moveEntry` now deletes via `FileSystemHandle.remove()` instead of `sourceParentHandle.removeEntry()`; the parent handle's cached directory listing becomes stale after creating a sibling folder, which caused "state had changed since it was read from disk" errors
+- **Stale sidebar after failed move**: `renderSidebar()` now runs in a `finally` block so it always fires, even on partial failure — prevents the sidebar from misrepresenting disk state and triggering subsequent mis-placed folder creation
 
 ### Changed
 - Removed dead code: `_clearPane2`, `_CODE_EXTENSIONS`, `_shouldUseWysiwygMode`
