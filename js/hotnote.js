@@ -787,8 +787,9 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
 
     const ext = getExtension(filename);
 
-    // In split mode: when opening in pane1, force source mode and mirror preview to pane2
-    if (state.splitMode && paneId === 'pane1') {
+    // In split mode: when opening in pane1 via a new file selection (not history nav),
+    // force source mode and mirror preview to pane2
+    if (state.splitMode && paneId === 'pane1' && pushHistory !== false) {
         const isImage = IMAGE_EXTENSIONS.has(ext);
         const isPreviewable = ['md', 'json', 'csv'].includes(ext) || isImage;
         determineInitialMode(ext, content, ps);
@@ -854,14 +855,15 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
 }
 
 function updateNavButtons() {
+    const activePs = getPaneState(state.activePaneId);
     const backBtn = document.getElementById('back-btn');
     const fwdBtn = document.getElementById('forward-btn');
-    if (backBtn) backBtn.disabled = state.fileHistoryIndex <= 0;
-    if (fwdBtn)  fwdBtn.disabled = state.fileHistoryIndex >= state.fileHistory.length - 1;
+    if (backBtn) backBtn.disabled = activePs.fileHistoryIndex <= 0;
+    if (fwdBtn)  fwdBtn.disabled = activePs.fileHistoryIndex >= activePs.fileHistory.length - 1;
 }
 
 async function navigateHistory(delta) {
-    const paneId = 'pane1';
+    const paneId = state.activePaneId;
     const ps = getPaneState(paneId);
     const target = ps.fileHistoryIndex + delta;
     if (target < 0 || target >= ps.fileHistory.length) return;
