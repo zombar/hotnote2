@@ -1,3 +1,9 @@
+## [0.7.1] — 2026-03-17
+
+### Fixed
+- **Smart target folder**: new file/folder input row now appears inside the parent folder of the active pane's current file (instead of the deepest expanded folder), preventing runaway nesting like `examples/test/examples/test/…`
+- **Mirror sync after delete+recreate**: same-file sync between panes now uses `isSameEntry` (cached as `_panesHaveSameFile`) instead of comparing relative path strings; prevents false mirroring when pane1 deletes and recreates a file at the same path while pane2 still holds the old (deleted) handle
+
 ## [0.7.0] — 2026-03-17
 ### Added
 - **Inline folder creation**: new folder button now shows an inline input (same UX as new file), replacing the old `prompt()` dialog

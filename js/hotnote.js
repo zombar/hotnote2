@@ -80,6 +80,7 @@ const state = {
     currentChar: 1,
     // Split pane state
     splitMode: false,
+    _panesHaveSameFile: false,
     activePaneId: 'pane1',
     // Pane 2 state (pane 1 uses the flat state fields above)
     pane2: {
@@ -512,6 +513,14 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
     return li;
 }
 
+async function _updateSameFileFlag() {
+    if (!state.splitMode || !state.currentFileHandle || !state.pane2.currentFileHandle) {
+        state._panesHaveSameFile = false;
+        return;
+    }
+    state._panesHaveSameFile = await state.currentFileHandle.isSameEntry(state.pane2.currentFileHandle);
+}
+
 async function _resolveAfterDelete(paneId, deletedHandle, deletedRelPath, isDirectory) {
     const ps = getPaneState(paneId);
 
@@ -625,13 +634,30 @@ function getFileIconSvg(name, kind) {
 // =========================================================================
 
 function getTargetDir() {
-    const expanded = [...document.querySelectorAll('#file-list .file-entry.expanded')];
-    if (expanded.length) {
-        const last = expanded[expanded.length - 1];
+    const expandedList = [...document.querySelectorAll('#file-list .file-entry.expanded')];
+
+    // Prefer the parent folder of the active pane's current file
+    const ps = getPaneState(state.activePaneId);
+    if (ps.currentRelativePath) {
+        const parts = ps.currentRelativePath.split('/');
+        parts.pop(); // drop filename
+        if (parts.length > 0) {
+            const parentRelPath = parts.join('/');
+            const parentLi = expandedList.find(li => li._dirRelPath === parentRelPath);
+            if (parentLi) {
+                return { handle: parentLi._dirHandle, relPath: parentLi._dirRelPath, li: parentLi };
+            }
+        }
+    }
+
+    // Fall back to deepest expanded folder
+    if (expandedList.length) {
+        const last = expandedList[expandedList.length - 1];
         if (last._dirHandle) {
             return { handle: last._dirHandle, relPath: last._dirRelPath || '', li: last };
         }
     }
+
     return {
         handle: state.currentDirHandle,
         relPath: state.pathStack.slice(1).map(p => p.name).join('/'),
@@ -869,6 +895,7 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
         updateURL();
     }
     updateNavButtons();
+    _updateSameFileFlag(); // fire-and-forget; updates state._panesHaveSameFile
 }
 
 function updateNavButtons() {
@@ -1469,6 +1496,7 @@ function clearEditor() {
     state.currentFilename = '';
     state.isDirty = false;
     state.editorMode = 'source';
+    state._panesHaveSameFile = false;
     updateTitle();
 
     const wrap = document.getElementById('source-editor-wrap');
@@ -1617,6 +1645,7 @@ function toggleSplitPane() {
         state.pane2.currentFileHandle = null;
         state.pane2.currentFilename = '';
         state.pane2.isDirty = false;
+        state._panesHaveSameFile = false;
         state.activePaneId = 'pane1';
         updateFocusRing();
     } else {
@@ -2342,7 +2371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSourceHighlight('pane1');
 
         // Same-file sync: if pane2 has the same file open, sync its content
-        if (state.splitMode && state.currentRelativePath && state.currentRelativePath === state.pane2.currentRelativePath) {
+        if (state.splitMode && state._panesHaveSameFile) {
             const textarea2 = document.getElementById('source-editor-p2');
             if (textarea2) textarea2.value = sourceEditor.value;
             updateSourceHighlight('pane2');
@@ -2357,7 +2386,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSourceHighlight('pane2');
 
         // Same-file sync: if pane1 has the same file open, sync its content
-        if (state.splitMode && state.pane2.currentRelativePath && state.pane2.currentRelativePath === state.currentRelativePath) {
+        if (state.splitMode && state._panesHaveSameFile) {
             const textarea1 = document.getElementById('source-editor');
             if (textarea1) textarea1.value = sourceEditor2.value;
             updateSourceHighlight('pane1');
