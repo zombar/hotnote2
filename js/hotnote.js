@@ -787,19 +787,25 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
 
     const ext = getExtension(filename);
 
-    // In split mode: when opening in pane1, force source mode in pane1 and open preview in pane2
+    // In split mode: when opening in pane1, force source mode and mirror preview to pane2
     if (state.splitMode && paneId === 'pane1') {
+        const isImage = IMAGE_EXTENSIONS.has(ext);
+        const isPreviewable = ['md', 'json', 'csv'].includes(ext) || isImage;
         determineInitialMode(ext, content, ps);
-        const isPreviewable = ['md', 'json', 'csv'].includes(ext) || IMAGE_EXTENSIONS.has(ext);
         if (isPreviewable) {
-            ps.editorMode = 'source';
+            if (!isImage) {
+                // Force pane1 to source for text-based previewable files
+                ps.editorMode = 'source';
+            }
             renderEditor(content, filename, 'pane1');
             // Mirror same file to pane2 in preview mode
             state.pane2.currentFileHandle = fileHandle;
             state.pane2.currentFilename = filename;
             state.pane2.currentRelativePath = state.currentRelativePath;
+            if (isImage) state.pane2.imageObjectUrl = ps.imageObjectUrl;
             determineInitialMode(ext, content, state.pane2);
-            // Force preview mode for pane2 (natural mode from determineInitialMode)
+            // markdown: determineInitialMode leaves mode as 'source'; force wysiwyg
+            if (ext === 'md') state.pane2.editorMode = 'wysiwyg';
             renderEditor(content, filename, 'pane2');
         } else {
             renderEditor(content, filename, 'pane1');
@@ -1589,6 +1595,7 @@ function toggleSplitPane() {
         const ps1 = state;
         if (ps1.currentFileHandle && ps1.currentFilename) {
             const ext = getExtension(ps1.currentFilename);
+            const isImage = IMAGE_EXTENSIONS.has(ext);
             const textarea1 = document.getElementById('source-editor');
             const content = textarea1 ? textarea1.value : '';
 
@@ -1597,12 +1604,18 @@ function toggleSplitPane() {
             state.pane2.currentRelativePath = ps1.currentRelativePath;
             state.pane2.autosaveEnabled = ps1.autosaveEnabled;
 
-            const isPreviewable = ['md', 'json', 'csv'].includes(ext) || IMAGE_EXTENSIONS.has(ext);
+            const isPreviewable = ['md', 'json', 'csv'].includes(ext) || isImage;
             if (isPreviewable) {
-                // pane1 → source, pane2 → preview
-                ps1.editorMode = 'source';
-                renderEditor(content, ps1.currentFilename, 'pane1');
+                if (!isImage) {
+                    // Force pane1 to source for text-based previewable files
+                    ps1.editorMode = 'source';
+                    renderEditor(content, ps1.currentFilename, 'pane1');
+                }
+                // Set up pane2 preview
+                if (isImage) state.pane2.imageObjectUrl = ps1.imageObjectUrl;
                 determineInitialMode(ext, content, state.pane2);
+                // markdown: determineInitialMode leaves mode as 'source'; force wysiwyg
+                if (ext === 'md') state.pane2.editorMode = 'wysiwyg';
                 renderEditor(content, ps1.currentFilename, 'pane2');
             } else {
                 // Both panes show source
@@ -1614,6 +1627,9 @@ function toggleSplitPane() {
             const toolbar2 = document.getElementById('mode-toolbar-p2');
             if (toolbar2) toolbar2.style.display = 'none';
         }
+
+        state.activePaneId = 'pane1';
+        updateFocusRing();
     }
 }
 
@@ -2257,29 +2273,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupPaneFocus(paneId) {
         const paneEl = document.getElementById(paneId);
         if (!paneEl) return;
-        paneEl.addEventListener('focusin', () => {
-            if (state.activePaneId !== paneId) {
-                state.activePaneId = paneId;
-                updateFocusRing();
-                updateNavButtons();
-                // Sync autosave checkbox to newly focused pane
-                const ps = getPaneState(paneId);
-                const autosaveCheckbox = document.getElementById('autosave-checkbox');
-                if (autosaveCheckbox) {
-                    autosaveCheckbox.checked = ps.autosaveEnabled;
-                    autosaveCheckbox.disabled = !ps.currentFileHandle;
-                }
-                const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
-                if (autosaveToggleLabel) {
-                    autosaveToggleLabel.style.opacity = ps.currentFileHandle ? '' : '0.4';
-                }
-            }
-        });
         paneEl.addEventListener('mousedown', () => {
-            if (state.activePaneId !== paneId) {
-                state.activePaneId = paneId;
-                updateFocusRing();
-                updateNavButtons();
+            state.activePaneId = paneId;
+            updateFocusRing();
+            updateNavButtons();
+            // Sync autosave checkbox to newly focused pane
+            const ps = getPaneState(paneId);
+            const autosaveCheckbox = document.getElementById('autosave-checkbox');
+            if (autosaveCheckbox) {
+                autosaveCheckbox.checked = ps.autosaveEnabled;
+                autosaveCheckbox.disabled = !ps.currentFileHandle;
+            }
+            const autosaveToggleLabel = document.getElementById('autosave-toggle-label');
+            if (autosaveToggleLabel) {
+                autosaveToggleLabel.style.opacity = ps.currentFileHandle ? '' : '0.4';
             }
         });
     }
