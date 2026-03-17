@@ -101,7 +101,7 @@ const state = {
     },
 };
 
-const dragState = { handle: null, parentHandle: null };
+const dragState = { handle: null, parentHandle: null, relPath: null };
 
 // =========================================================================
 // Pane Helpers
@@ -416,12 +416,14 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
     li.addEventListener('dragstart', (e) => {
         dragState.handle = entry.handle;
         dragState.parentHandle = parentHandle;
+        dragState.relPath = li._dirRelPath || li._relPath || null;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', entry.name);
         requestAnimationFrame(() => li.classList.add('dragging'));
     });
     li.addEventListener('dragend', () => {
         li.classList.remove('dragging');
+        dragState.relPath = null;
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         document.getElementById('file-list')?.classList.remove('drag-over-list');
     });
@@ -450,6 +452,8 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
 
         li.addEventListener('dragover', (e) => {
             if (!dragState.handle || dragState.handle === entry.handle) return;
+            // Prevent dropping a folder into itself or any of its descendants
+            if (dragState.relPath && (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) return;
             e.preventDefault();
             e.stopPropagation();
             e.dataTransfer.dropEffect = 'move';
@@ -463,9 +467,17 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
             e.stopPropagation();
             li.classList.remove('drag-over');
             if (!dragState.handle || dragState.handle === entry.handle) return;
+            // Prevent circular move: dropping a folder into its own subtree
+            if (dragState.relPath && (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) {
+                dragState.handle = null;
+                dragState.parentHandle = null;
+                dragState.relPath = null;
+                return;
+            }
             const { handle, parentHandle: srcParent } = dragState;
             dragState.handle = null;
             dragState.parentHandle = null;
+            dragState.relPath = null;
             await moveEntry(srcParent, handle, entry.handle);
         });
     } else {
@@ -2431,6 +2443,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { handle, parentHandle: srcParent } = dragState;
         dragState.handle = null;
         dragState.parentHandle = null;
+        dragState.relPath = null;
         await moveEntry(srcParent, handle, state.currentDirHandle);
     });
 
