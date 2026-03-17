@@ -1546,6 +1546,9 @@ function toggleSplitPane() {
         if (pane2El) pane2El.style.display = 'none';
         if (splitHandle) splitHandle.style.display = 'none';
         if (btn) btn.classList.remove('active');
+        // Reset pane1 flex so it expands to fill the full container again
+        const pane1El = document.getElementById('pane1');
+        if (pane1El) { pane1El.style.flexBasis = ''; pane1El.style.flexGrow = ''; pane1El.style.flexShrink = ''; }
         // Reset pane2 state
         state.pane2.currentFileHandle = null;
         state.pane2.currentFilename = '';
