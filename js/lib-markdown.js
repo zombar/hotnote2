@@ -22,7 +22,9 @@
         if (typeof document !== 'undefined') {
             const div = document.createElement('div');
             div.textContent = text;
-            return div.innerHTML;
+            // div.innerHTML escapes <, >, & but NOT " — fix that so data-md attributes
+            // with double-quoted values don't break when text contains literal "
+            return div.innerHTML.replace(/"/g, '&quot;');
         }
         return String(text)
             .replace(/&/g, '&amp;')
