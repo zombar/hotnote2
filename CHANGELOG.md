@@ -1,3 +1,14 @@
+## [0.7.2] — 2026-03-17
+
+### Fixed
+- **Wysiwyg pane2 link clicks**: registering the click handler once at init instead of on every mode switch; previously each wysiwyg→source→wysiwyg cycle stacked another handler, causing links to open multiple tabs
+- **Memory leaks**: `URL.revokeObjectURL` now called when clearing pane1 (on file delete) and when closing the split pane, preventing orphaned blob URLs for image files
+- **Autosave timer leak**: pending autosave timer for pane2 is now cancelled when closing the split pane
+
+### Changed
+- Removed dead code: `_clearPane2`, `_CODE_EXTENSIONS`, `_shouldUseWysiwygMode`
+- Deduplicated `keyup`/`mouseup` cursor-position logic into a shared `_updateCursorPosition` helper
+
 ## [0.7.1] — 2026-03-17
 
 ### Fixed

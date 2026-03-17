@@ -14,12 +14,6 @@ const TEXT_EXTENSIONS = new Set([
     'graphql', 'proto', 'tf', 'hcl', 'log', 'csv',
 ]);
 
-const _CODE_EXTENSIONS = new Set([
-    'js', 'ts', 'jsx', 'tsx', 'go', 'py', 'rb', 'rs', 'css', 'scss',
-    'html', 'htm', 'xml', 'sh', 'bash', 'zsh', 'yaml', 'yml',
-    'toml', 'sql', 'graphql', 'proto', 'tf', 'hcl', 'conf', 'ini', 'cfg',
-]);
-
 const IMAGE_EXTENSIONS = new Set([
     'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif',
 ]);
@@ -1406,19 +1400,6 @@ function switchToMode(mode, paneId = 'pane1', content) {
                 }
                 resolveLocalImages(wysiwyg).catch(console.error);
                 applySyntaxHighlighting(wysiwyg);
-
-                // Wire up link clicks for this wysiwyg element (pane2 needs its own listener)
-                if (paneId === 'pane2') {
-                    wysiwyg.addEventListener('click', (e) => {
-                        const link = e.target.closest('a[href]');
-                        if (!link) return;
-                        e.preventDefault();
-                        const href = link.getAttribute('href');
-                        if (href && href !== '#') {
-                            window.open(href, '_blank', 'noopener,noreferrer');
-                        }
-                    }, { once: false });
-                }
             }
             break;
 
@@ -1470,28 +1451,11 @@ function switchToMode(mode, paneId = 'pane1', content) {
     });
 }
 
-function _clearPane2() {
-    state.pane2.currentFileHandle = null;
-    state.pane2.currentFilename = '';
-    state.pane2.isDirty = false;
-    state.pane2.editorMode = 'source';
-    const wrap2    = document.getElementById('source-editor-wrap-p2');
-    const textarea2 = document.getElementById('source-editor-p2');
-    const wysiwyg2  = document.getElementById('wysiwyg-p2');
-    const datasheet2 = document.getElementById('s3-datasheet-p2');
-    const treeview2  = document.getElementById('s3-treeview-p2');
-    const imgViewer2 = document.getElementById('image-viewer-p2');
-    const toolbar2   = document.getElementById('mode-toolbar-p2');
-    if (wrap2)     wrap2.style.display     = 'none';
-    if (textarea2) textarea2.value         = '';
-    if (wysiwyg2)  wysiwyg2.style.display  = 'none';
-    if (datasheet2) datasheet2.style.display = 'none';
-    if (treeview2)  treeview2.style.display  = 'none';
-    if (imgViewer2) imgViewer2.style.display = 'none';
-    if (toolbar2) { toolbar2.style.display = 'none'; toolbar2.innerHTML = ''; }
-}
-
 function clearEditor() {
+    if (state.imageObjectUrl) {
+        URL.revokeObjectURL(state.imageObjectUrl);
+        state.imageObjectUrl = null;
+    }
     state.currentFileHandle = null;
     state.currentFilename = '';
     state.isDirty = false;
@@ -1642,6 +1606,14 @@ function toggleSplitPane() {
         const pane1El = document.getElementById('pane1');
         if (pane1El) { pane1El.style.flexBasis = ''; pane1El.style.flexGrow = ''; pane1El.style.flexShrink = ''; }
         // Reset pane2 state
+        if (state.pane2.imageObjectUrl) {
+            URL.revokeObjectURL(state.pane2.imageObjectUrl);
+            state.pane2.imageObjectUrl = null;
+        }
+        if (state.pane2.autosaveTimer) {
+            clearTimeout(state.pane2.autosaveTimer);
+            state.pane2.autosaveTimer = null;
+        }
         state.pane2.currentFileHandle = null;
         state.pane2.currentFilename = '';
         state.pane2.isDirty = false;
@@ -1807,11 +1779,6 @@ function initResizeHandle() {
 // JSON detection (from tunnelmesh s3explorer)
 // =========================================================================
 
-function _shouldUseWysiwygMode(ext, content) {
-    if (ext !== 'md') return false;
-    if (!content || content.trim().length === 0) return false;
-    return true;
-}
 
 function detectJsonType(content) {
     try {
@@ -2328,6 +2295,15 @@ document.addEventListener('DOMContentLoaded', () => {
             window.open(href, '_blank', 'noopener,noreferrer');
         }
     });
+    document.getElementById('wysiwyg-p2')?.addEventListener('click', (e) => {
+        const link = e.target.closest('a[href]');
+        if (!link) return;
+        e.preventDefault();
+        const href = link.getAttribute('href');
+        if (href && href !== '#') {
+            window.open(href, '_blank', 'noopener,noreferrer');
+        }
+    });
 
     // Save button
     const saveBtn = document.getElementById('save-btn');
@@ -2518,22 +2494,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Track cursor line for URL/localStorage sync (pane1 only)
     let _lineDebounce = null;
-    sourceEditor?.addEventListener('keyup', () => {
+    function _updateCursorPosition() {
         const pos = sourceEditor.selectionStart || 0;
         state.currentLine = (sourceEditor.value.substring(0, pos).match(/\n/g) || []).length + 1;
         const lastNewline = sourceEditor.value.lastIndexOf('\n', pos - 1);
         state.currentChar = lastNewline === -1 ? pos + 1 : pos - lastNewline;
         clearTimeout(_lineDebounce);
         _lineDebounce = setTimeout(updateURL, 600);
-    });
-    sourceEditor?.addEventListener('mouseup', () => {
-        const pos = sourceEditor.selectionStart || 0;
-        state.currentLine = (sourceEditor.value.substring(0, pos).match(/\n/g) || []).length + 1;
-        const lastNewline = sourceEditor.value.lastIndexOf('\n', pos - 1);
-        state.currentChar = lastNewline === -1 ? pos + 1 : pos - lastNewline;
-        clearTimeout(_lineDebounce);
-        _lineDebounce = setTimeout(updateURL, 600);
-    });
+    }
+    sourceEditor?.addEventListener('keyup', _updateCursorPosition);
+    sourceEditor?.addEventListener('mouseup', _updateCursorPosition);
 
     // Autosave init
     state.autosaveEnabled = loadAutosavePref();
