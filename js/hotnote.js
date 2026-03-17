@@ -2342,9 +2342,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSourceHighlight('pane1');
 
         // Same-file sync: if pane2 has the same file open, sync its content
-        if (state.splitMode && state.pane2.currentFilename === state.currentFilename) {
+        if (state.splitMode && state.currentRelativePath && state.currentRelativePath === state.pane2.currentRelativePath) {
             const textarea2 = document.getElementById('source-editor-p2');
             if (textarea2) textarea2.value = sourceEditor.value;
+            updateSourceHighlight('pane2');
             debouncedSyncPreview('pane2');
         }
     });
@@ -2356,7 +2357,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSourceHighlight('pane2');
 
         // Same-file sync: if pane1 has the same file open, sync its content
-        if (state.splitMode && state.currentFilename === state.pane2.currentFilename) {
+        if (state.splitMode && state.pane2.currentRelativePath && state.pane2.currentRelativePath === state.currentRelativePath) {
             const textarea1 = document.getElementById('source-editor');
             if (textarea1) textarea1.value = sourceEditor2.value;
             updateSourceHighlight('pane1');

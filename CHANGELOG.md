@@ -11,6 +11,11 @@
   - Draggable resize handle between panes
 
 ### Fixed
+- When the same file is open in both panes in source mode, typing in one pane now
+  correctly mirrors text in the other pane (the backdrop highlight was not being
+  updated, making the synced pane appear blank due to `color: transparent` on the textarea)
+- Same-file sync detection now uses relative path instead of bare filename, preventing
+  false matches for files with identical names in different folders
 - Deleting an open file now navigates back to the previously-open file rather than
   showing an empty editor; if pane2 has no remaining history after deletion, split
   mode is automatically closed; deleted folders correctly affect all open files inside them
