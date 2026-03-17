@@ -10,6 +10,11 @@
   - URL and history track only pane 1; back/forward buttons operate on the active pane's history
   - Draggable resize handle between panes
 
+### Fixed
+- Deleting an open file now navigates back to the previously-open file rather than
+  showing an empty editor; if pane2 has no remaining history after deletion, split
+  mode is automatically closed; deleted folders correctly affect all open files inside them
+
 ## [0.6.0] — 2026-03-16
 ### Added
 - URL now tracks cursor column (`&char=N`) alongside line number (`&line=N`)

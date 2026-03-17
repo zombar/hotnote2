@@ -433,6 +433,7 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
         // Store dir handle on the li for getTargetDir()
         li._dirHandle = entry.handle;
         li._dirRelPath = folderRelPath;
+        li._relPath = folderRelPath;
 
         li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
             if (e.target.closest('.delete-btn')) return;
@@ -479,6 +480,7 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
 
         if (!unopenable) {
             const fileRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
+            li._relPath = fileRelPath;
             li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
                 if (e.target.closest('.delete-btn')) return;
                 state.currentRelativePath = fileRelPath;
@@ -493,10 +495,9 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
         const dirHandle = parentHandle || state.currentDirHandle;
         try {
             await dirHandle.removeEntry(entry.name, { recursive: true });
-            if (entry.kind === 'file') {
-                if (state.currentFileHandle && await entry.handle.isSameEntry(state.currentFileHandle)) clearEditor();
-                if (state.pane2.currentFileHandle && await entry.handle.isSameEntry(state.pane2.currentFileHandle)) clearPane2();
-            }
+            const isDirectory = entry.kind === 'directory';
+            await _resolveAfterDelete('pane1', entry.handle, li._relPath, isDirectory);
+            if (state.splitMode) await _resolveAfterDelete('pane2', entry.handle, li._relPath, isDirectory);
             // Remove the entry from DOM directly if it's a nested entry
             if (parentHandle) {
                 li.remove();
@@ -509,6 +510,55 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
     });
 
     return li;
+}
+
+async function _resolveAfterDelete(paneId, deletedHandle, deletedRelPath, isDirectory) {
+    const ps = getPaneState(paneId);
+
+    // 1. Check whether this pane's current file is the one being deleted
+    let currentAffected = false;
+    if (isDirectory) {
+        currentAffected = !!(ps.currentRelativePath && (
+            ps.currentRelativePath === deletedRelPath ||
+            ps.currentRelativePath.startsWith(deletedRelPath + '/')
+        ));
+    } else {
+        currentAffected = !!(ps.currentFileHandle &&
+            await deletedHandle.isSameEntry(ps.currentFileHandle));
+    }
+
+    // 2. Prune all affected entries from history, adjusting the index
+    const oldIdx = ps.fileHistoryIndex;
+    let prunedAtOrBefore = 0;
+    ps.fileHistory = ps.fileHistory.filter((e, i) => {
+        const affected = isDirectory
+            ? (e.relPath && (e.relPath === deletedRelPath || e.relPath.startsWith(deletedRelPath + '/')))
+            : (e.relPath === deletedRelPath);
+        if (affected && i <= oldIdx) prunedAtOrBefore++;
+        return !affected;
+    });
+    ps.fileHistoryIndex = Math.min(
+        Math.max(-1, oldIdx - prunedAtOrBefore),
+        ps.fileHistory.length - 1
+    );
+
+    if (!currentAffected) return;   // this pane wasn't showing the deleted item
+
+    // 3. Open the new current history entry, or clear / close split
+    const newIdx = ps.fileHistoryIndex;
+    if (newIdx >= 0 && ps.fileHistory.length > 0) {
+        const { handle, name, relPath } = ps.fileHistory[newIdx];
+        if (paneId === 'pane1') state.currentRelativePath = relPath ?? null;
+        else ps.currentRelativePath = relPath ?? null;
+        await openFile(handle, name, false, paneId);
+    } else {
+        if (paneId === 'pane2' && state.splitMode) {
+            toggleSplitPane();   // nothing left in pane2 → close split
+        } else {
+            clearEditor();       // nothing left in pane1 → empty state
+        }
+    }
+    updateNavButtons();
 }
 
 async function toggleFolder(li, handle, dirRelPath) {
@@ -1393,7 +1443,7 @@ function switchToMode(mode, paneId = 'pane1', content) {
     });
 }
 
-function clearPane2() {
+function _clearPane2() {
     state.pane2.currentFileHandle = null;
     state.pane2.currentFilename = '';
     state.pane2.isDirty = false;
