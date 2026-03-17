@@ -787,34 +787,8 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
 
     const ext = getExtension(filename);
 
-    // In split mode: when opening in pane1 via a new file selection (not history nav),
-    // force source mode and mirror preview to pane2
-    if (state.splitMode && paneId === 'pane1' && pushHistory !== false) {
-        const isImage = IMAGE_EXTENSIONS.has(ext);
-        const isPreviewable = ['md', 'json', 'csv'].includes(ext) || isImage;
-        determineInitialMode(ext, content, ps);
-        if (isPreviewable) {
-            if (!isImage) {
-                // Force pane1 to source for text-based previewable files
-                ps.editorMode = 'source';
-            }
-            renderEditor(content, filename, 'pane1');
-            // Mirror same file to pane2 in preview mode
-            state.pane2.currentFileHandle = fileHandle;
-            state.pane2.currentFilename = filename;
-            state.pane2.currentRelativePath = state.currentRelativePath;
-            if (isImage) state.pane2.imageObjectUrl = ps.imageObjectUrl;
-            determineInitialMode(ext, content, state.pane2);
-            // markdown: determineInitialMode leaves mode as 'source'; force wysiwyg
-            if (ext === 'md') state.pane2.editorMode = 'wysiwyg';
-            renderEditor(content, filename, 'pane2');
-        } else {
-            renderEditor(content, filename, 'pane1');
-        }
-    } else {
-        determineInitialMode(ext, content, ps);
-        renderEditor(content, filename, paneId);
-    }
+    determineInitialMode(ext, content, ps);
+    renderEditor(content, filename, paneId);
 
     // Restore cursor for previously-visited file (pane1 only for URL tracking)
     if (paneId === 'pane1' && _cachedPos && _cachedPos.cursorStart !== undefined) {
