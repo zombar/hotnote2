@@ -453,7 +453,8 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
         li.addEventListener('dragover', (e) => {
             if (!dragState.handle || dragState.handle === entry.handle) return;
             // Prevent dropping a folder into itself or any of its descendants
-            if (dragState.relPath && (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) return;
+            if (dragState.handle.kind === 'directory' && dragState.relPath &&
+                (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) return;
             e.preventDefault();
             e.stopPropagation();
             e.dataTransfer.dropEffect = 'move';
@@ -468,7 +469,8 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
             li.classList.remove('drag-over');
             if (!dragState.handle || dragState.handle === entry.handle) return;
             // Prevent circular move: dropping a folder into its own subtree
-            if (dragState.relPath && (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) {
+            if (dragState.handle.kind === 'directory' && dragState.relPath &&
+                (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) {
                 dragState.handle = null;
                 dragState.parentHandle = null;
                 dragState.relPath = null;
@@ -666,13 +668,17 @@ function getTargetDir() {
             if (parentLi) {
                 return { handle: parentLi._dirHandle, relPath: parentLi._dirRelPath, li: parentLi };
             }
-            // Parent folder exists but is not expanded in the sidebar — fall back to root
-            // so we never place the input inside an unrelated deeply-expanded folder.
         }
-        // File is at the root of the current directory — insert at root level.
     }
 
-    // No file open, or parent not visible — always default to root to prevent loop nesting.
+    // Fall back to deepest expanded folder
+    if (expandedList.length) {
+        const last = expandedList[expandedList.length - 1];
+        if (last._dirHandle) {
+            return { handle: last._dirHandle, relPath: last._dirRelPath || '', li: last };
+        }
+    }
+
     return {
         handle: state.currentDirHandle,
         relPath: state.pathStack.slice(1).map(p => p.name).join('/'),
