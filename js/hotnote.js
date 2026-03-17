@@ -452,6 +452,8 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
 
         li.addEventListener('dragover', (e) => {
             if (!dragState.handle || dragState.handle === entry.handle) return;
+            // Only claim this drop when hovering directly over THIS folder, not nested content
+            if (e.target.closest('.file-entry') !== li) return;
             // Prevent dropping a folder into itself or any of its descendants
             if (dragState.handle.kind === 'directory' && dragState.relPath &&
                 (folderRelPath === dragState.relPath || folderRelPath.startsWith(dragState.relPath + '/'))) return;
@@ -553,8 +555,13 @@ async function _resolveAfterDelete(paneId, deletedHandle, deletedRelPath, isDire
             ps.currentRelativePath.startsWith(deletedRelPath + '/')
         ));
     } else {
-        currentAffected = !!(ps.currentFileHandle &&
-            await deletedHandle.isSameEntry(ps.currentFileHandle));
+        try {
+            currentAffected = !!(ps.currentFileHandle &&
+                await deletedHandle.isSameEntry(ps.currentFileHandle));
+        } catch (_) { /* handle may be invalid after deletion */ }
+        if (!currentAffected && deletedRelPath) {
+            currentAffected = ps.currentRelativePath === deletedRelPath;
+        }
     }
 
     // 2. Prune all affected entries from history, adjusting the index

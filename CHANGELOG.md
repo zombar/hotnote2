@@ -1,3 +1,13 @@
+## [0.7.3] — 2026-03-17
+
+### Fixed
+- **Delete doesn't close editor**: `_resolveAfterDelete` now falls back to relative-path
+  comparison when `isSameEntry` returns false after deletion (Chrome can return false for
+  handles whose file no longer exists on disk)
+- **Drag to workdir root impossible**: folder `dragover` now only claims the drop when the
+  cursor is directly over the folder's own row, not over nested children; dragging a file
+  out of an expanded subfolder now correctly activates the file-list root drop zone
+
 ## [0.7.2] — 2026-03-17
 
 ### Fixed
