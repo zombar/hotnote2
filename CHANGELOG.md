@@ -4,6 +4,7 @@
 - **Wysiwyg pane2 link clicks**: registering the click handler once at init instead of on every mode switch; previously each wysiwyg→source→wysiwyg cycle stacked another handler, causing links to open multiple tabs
 - **Memory leaks**: `URL.revokeObjectURL` now called when clearing pane1 (on file delete) and when closing the split pane, preventing orphaned blob URLs for image files
 - **Autosave timer leak**: pending autosave timer for pane2 is now cancelled when closing the split pane
+- **Folder loop nesting**: removed "deepest expanded folder" fallback from `getTargetDir()`; it caused runaway nesting (`examples/test/examples/test/…`) when the current file's parent wasn't visible in the sidebar, or when no file was open. Now always falls back to the root of the current directory view
 
 ### Changed
 - Removed dead code: `_clearPane2`, `_CODE_EXTENSIONS`, `_shouldUseWysiwygMode`

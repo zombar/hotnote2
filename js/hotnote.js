@@ -641,17 +641,13 @@ function getTargetDir() {
             if (parentLi) {
                 return { handle: parentLi._dirHandle, relPath: parentLi._dirRelPath, li: parentLi };
             }
+            // Parent folder exists but is not expanded in the sidebar — fall back to root
+            // so we never place the input inside an unrelated deeply-expanded folder.
         }
+        // File is at the root of the current directory — insert at root level.
     }
 
-    // Fall back to deepest expanded folder
-    if (expandedList.length) {
-        const last = expandedList[expandedList.length - 1];
-        if (last._dirHandle) {
-            return { handle: last._dirHandle, relPath: last._dirRelPath || '', li: last };
-        }
-    }
-
+    // No file open, or parent not visible — always default to root to prevent loop nesting.
     return {
         handle: state.currentDirHandle,
         relPath: state.pathStack.slice(1).map(p => p.name).join('/'),
