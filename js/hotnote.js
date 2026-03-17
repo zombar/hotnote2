@@ -493,8 +493,9 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
         const dirHandle = parentHandle || state.currentDirHandle;
         try {
             await dirHandle.removeEntry(entry.name, { recursive: true });
-            if (entry.kind === 'file' && entry.name === state.currentFilename) {
-                clearEditor();
+            if (entry.kind === 'file') {
+                if (state.currentFileHandle && await entry.handle.isSameEntry(state.currentFileHandle)) clearEditor();
+                if (state.pane2.currentFileHandle && await entry.handle.isSameEntry(state.pane2.currentFileHandle)) clearPane2();
             }
             // Remove the entry from DOM directly if it's a nested entry
             if (parentHandle) {
@@ -623,87 +624,79 @@ async function refreshTargetFolder(li) {
 // New File / Folder
 // =========================================================================
 
-function showNewFileInput() {
-    const existing = document.getElementById('new-file-input-wrap');
+function _insertInputRow(id, placeholder, iconKind, onCommit) {
+    const existing = document.getElementById(id);
     if (existing) { existing.querySelector('input')?.focus(); return; }
 
     const target = getTargetDir();
 
-    const wrap = document.createElement('div');
-    wrap.id = 'new-file-input-wrap';
-    wrap.className = 'new-file-input-wrap';
+    const li = document.createElement('li');
+    li.id = id;
+    li.className = 'file-entry new-item-input-row';
+    li.innerHTML = `<div class="file-entry-row">
+        <span class="toggle-spacer"></span>
+        <span class="icon">${getFileIconSvg(iconKind === 'file' ? '' : '_dir', iconKind)}</span>
+        <input type="text" class="new-item-input" placeholder="${escapeHtml(placeholder)}" autocomplete="off">
+    </div>`;
 
-    const hintText = target.li ? `in: ${target.li.querySelector('.name')?.textContent || target.relPath}` : '';
-    wrap.innerHTML = `<input type="text" placeholder="filename.md" autocomplete="off">${hintText ? `<span class="input-target-hint">${escapeHtml(hintText)}</span>` : ''}`;
+    if (target.li) {
+        const childUl = target.li.querySelector('.folder-children');
+        if (childUl) childUl.appendChild(li);
+        else document.getElementById('file-list')?.prepend(li);
+    } else {
+        document.getElementById('file-list')?.prepend(li);
+    }
 
-    const toolbar = document.getElementById('sidebar-toolbar');
-    toolbar.insertAdjacentElement('afterend', wrap);
-
-    const input = wrap.querySelector('input');
+    const input = li.querySelector('input');
     input.focus();
+
+    // Dynamically update file icon as user types (file inputs only)
+    if (iconKind === 'file') {
+        input.addEventListener('input', () => {
+            const iconEl = li.querySelector('.icon');
+            if (iconEl) iconEl.innerHTML = getFileIconSvg(input.value, 'file');
+        });
+    }
 
     input.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter') {
             const name = input.value.trim();
-            if (!name) { wrap.remove(); return; }
-            wrap.remove();
-            try {
-                const targetRelPath = target.relPath;
-                const dirs = targetRelPath ? [targetRelPath] : state.pathStack.slice(1).map(p => p.name);
-                state.currentRelativePath = dirs.length && dirs[0] ? dirs.join('/') + '/' + name : name;
-                const handle = await createFile(name, target.handle);
-                await refreshTargetFolder(target.li);
-                await openFile(handle, name, true, state.activePaneId);
-            } catch (err) {
-                alert(`Failed to create file: ${err.message}`);
-            }
+            if (!name) { li.remove(); return; }
+            li.remove();
+            await onCommit(name, target);
         } else if (e.key === 'Escape') {
-            wrap.remove();
+            li.remove();
         }
     });
 
     input.addEventListener('blur', () => {
-        setTimeout(() => wrap.remove(), 150);
+        setTimeout(() => li.remove(), 150);
+    });
+}
+
+function showNewFileInput() {
+    _insertInputRow('new-file-input-wrap', 'filename.md', 'file', async (name, target) => {
+        try {
+            const targetRelPath = target.relPath;
+            const dirs = targetRelPath ? [targetRelPath] : state.pathStack.slice(1).map(p => p.name);
+            state.currentRelativePath = dirs.length && dirs[0] ? dirs.join('/') + '/' + name : name;
+            const handle = await createFile(name, target.handle);
+            await refreshTargetFolder(target.li);
+            await openFile(handle, name, true, state.activePaneId);
+        } catch (err) {
+            alert(`Failed to create file: ${err.message}`);
+        }
     });
 }
 
 function showNewFolderInput() {
-    const existing = document.getElementById('new-folder-input-wrap');
-    if (existing) { existing.querySelector('input')?.focus(); return; }
-
-    const target = getTargetDir();
-
-    const wrap = document.createElement('div');
-    wrap.id = 'new-folder-input-wrap';
-    wrap.className = 'new-folder-input-wrap';
-
-    const hintText = target.li ? `in: ${target.li.querySelector('.name')?.textContent || target.relPath}` : '';
-    wrap.innerHTML = `<input type="text" placeholder="folder-name" autocomplete="off">${hintText ? `<span class="input-target-hint">${escapeHtml(hintText)}</span>` : ''}`;
-
-    const toolbar = document.getElementById('sidebar-toolbar');
-    toolbar.insertAdjacentElement('afterend', wrap);
-
-    const input = wrap.querySelector('input');
-    input.focus();
-
-    input.addEventListener('keydown', async (e) => {
-        if (e.key === 'Enter') {
-            const name = input.value.trim();
-            if (!name) { wrap.remove(); return; }
-            wrap.remove();
-            try {
-                await createFolder(name, target.handle);
-                await refreshTargetFolder(target.li);
-            } catch (err) {
-                alert(`Failed to create folder: ${err.message}`);
-            }
-        } else if (e.key === 'Escape') {
-            wrap.remove();
+    _insertInputRow('new-folder-input-wrap', 'folder-name', 'directory', async (name, target) => {
+        try {
+            await createFolder(name, target.handle);
+            await refreshTargetFolder(target.li);
+        } catch (err) {
+            alert(`Failed to create folder: ${err.message}`);
         }
-    });
-
-    input.addEventListener('blur', () => {
-        setTimeout(() => wrap.remove(), 150);
     });
 }
 
@@ -1398,6 +1391,27 @@ function switchToMode(mode, paneId = 'pane1', content) {
         const btnMode = btn.id?.replace('mode-', '').replace('-p2', '');
         btn.classList.toggle('active', btnMode === mode);
     });
+}
+
+function clearPane2() {
+    state.pane2.currentFileHandle = null;
+    state.pane2.currentFilename = '';
+    state.pane2.isDirty = false;
+    state.pane2.editorMode = 'source';
+    const wrap2    = document.getElementById('source-editor-wrap-p2');
+    const textarea2 = document.getElementById('source-editor-p2');
+    const wysiwyg2  = document.getElementById('wysiwyg-p2');
+    const datasheet2 = document.getElementById('s3-datasheet-p2');
+    const treeview2  = document.getElementById('s3-treeview-p2');
+    const imgViewer2 = document.getElementById('image-viewer-p2');
+    const toolbar2   = document.getElementById('mode-toolbar-p2');
+    if (wrap2)     wrap2.style.display     = 'none';
+    if (textarea2) textarea2.value         = '';
+    if (wysiwyg2)  wysiwyg2.style.display  = 'none';
+    if (datasheet2) datasheet2.style.display = 'none';
+    if (treeview2)  treeview2.style.display  = 'none';
+    if (imgViewer2) imgViewer2.style.display = 'none';
+    if (toolbar2) { toolbar2.style.display = 'none'; toolbar2.innerHTML = ''; }
 }
 
 function clearEditor() {

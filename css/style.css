@@ -432,37 +432,22 @@ main {
     flex-shrink: 0;
 }
 
-.new-file-input-wrap, .new-folder-input-wrap {
-    padding: 0.25rem 0.75rem;
-    border-bottom: 1px solid var(--color-border-primary);
-}
-
-.new-file-input-wrap input, .new-folder-input-wrap input {
-    width: 100%;
-    padding: 0.3rem 0.5rem;
-    background: var(--color-bg-primary);
-    border: 1px solid var(--color-text-secondary);
+.new-item-input-row .new-item-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--color-btn-bg);
+    border: 1px solid var(--color-btn-border);
+    border-radius: var(--btn-border-radius);
     color: var(--color-text-primary);
+    font-family: var(--font-mono);
     font-size: 0.8125rem;
-    font-family: var(--font-mono);
+    padding: 0.1rem 0.4rem;
     outline: none;
-    border-radius: var(--panel-border-radius);
 }
 
-.new-file-input-wrap input:focus, .new-folder-input-wrap input:focus {
-    border-color: var(--color-text-primary);
-    outline: 2px solid var(--color-text-primary);
-    outline-offset: 1px;
-    box-shadow: 0 0 0 3px var(--focus-glow);
-}
-
-.input-target-hint {
-    display: block;
-    font-size: 0.7rem;
-    color: var(--color-text-tertiary);
-    font-family: var(--font-mono);
-    padding: 0.1rem 0 0.1rem 0.2rem;
-    letter-spacing: 0.02em;
+.new-item-input-row .new-item-input:focus {
+    border-color: var(--color-text-secondary);
+    box-shadow: 0 0 0 2px var(--focus-glow);
 }
 
 /* =====================================================================
