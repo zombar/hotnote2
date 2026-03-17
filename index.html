@@ -90,6 +90,9 @@
                 <button class="btn btn-sm btn-icon" id="new-folder-btn" title="New folder" aria-label="New folder">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
                 </button>
+                <button class="btn btn-sm btn-icon" id="split-pane-btn" title="Toggle split pane" aria-label="Toggle split pane">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                </button>
                 <button class="btn btn-sm btn-icon" id="back-btn" disabled title="Back" aria-label="Back">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
@@ -100,18 +103,33 @@
             <ul id="file-list"></ul>
         </aside>
         <div id="resize-handle"></div>
-        <section id="editor-area">
-            <div id="mode-toolbar" style="display:none"></div>
-            <div id="source-editor-wrap">
-                <div id="line-numbers" aria-hidden="true"></div>
-                <pre id="source-highlight-backdrop" aria-hidden="true"><code id="source-highlight-code"></code></pre>
-                <textarea id="source-editor" spellcheck="false"></textarea>
-            </div>
-            <div id="wysiwyg" contenteditable="false"></div>
-            <div id="s3-datasheet" style="display:none"></div>
-            <div id="s3-treeview" style="display:none"></div>
-            <div id="image-viewer" style="display:none"></div>
-        </section>
+        <div id="editor-container">
+            <section class="pane" id="pane1">
+                <div id="mode-toolbar" style="display:none"></div>
+                <div id="source-editor-wrap">
+                    <div id="line-numbers" aria-hidden="true"></div>
+                    <pre id="source-highlight-backdrop" aria-hidden="true"><code id="source-highlight-code"></code></pre>
+                    <textarea id="source-editor" spellcheck="false"></textarea>
+                </div>
+                <div id="wysiwyg" contenteditable="false"></div>
+                <div id="s3-datasheet" style="display:none"></div>
+                <div id="s3-treeview" style="display:none"></div>
+                <div id="image-viewer" style="display:none"></div>
+            </section>
+            <div id="split-resize-handle" style="display:none"></div>
+            <section class="pane" id="pane2" style="display:none">
+                <div id="mode-toolbar-p2"></div>
+                <div id="source-editor-wrap-p2">
+                    <div id="line-numbers-p2" aria-hidden="true"></div>
+                    <pre id="source-highlight-backdrop-p2" aria-hidden="true"><code id="source-highlight-code-p2"></code></pre>
+                    <textarea id="source-editor-p2" spellcheck="false"></textarea>
+                </div>
+                <div id="wysiwyg-p2" contenteditable="false"></div>
+                <div id="s3-datasheet-p2" style="display:none"></div>
+                <div id="s3-treeview-p2" style="display:none"></div>
+                <div id="image-viewer-p2" style="display:none"></div>
+            </section>
+        </div>
     </main>
 </div>
 

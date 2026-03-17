@@ -1,3 +1,55 @@
+## [0.7.3] — 2026-03-17
+
+### Fixed
+- **Delete not closing editor**: `_resolveAfterDelete` now wraps `isSameEntry` in try/catch (handle may be invalid post-deletion) and adds a `relPath` fallback so deleting the open file always clears the editor
+- **Create target ignoring last expanded folder**: `getTargetDir()` now tracks `lastExpandedRelPath` in state; the most recently expanded folder is used as the create target, falling back to the active file's parent folder; collapsing a folder walks the target up to the parent
+- **Multiple files highlighted as active**: sidebar active state now compares by full relative path instead of filename; files with identical names in different folders no longer both appear selected
+- **File/folder input boxes not exclusive**: opening a new-file input now dismisses any open new-folder input and vice versa
+- **Empty folder placeholder visible during input**: "Empty folder" text is now hidden while the creation input row is visible in that folder and restored on cancel
+
+## [0.7.2] — 2026-03-17
+
+### Fixed
+- **Wysiwyg pane2 link clicks**: registering the click handler once at init instead of on every mode switch; previously each wysiwyg→source→wysiwyg cycle stacked another handler, causing links to open multiple tabs
+- **Memory leaks**: `URL.revokeObjectURL` now called when clearing pane1 (on file delete) and when closing the split pane, preventing orphaned blob URLs for image files
+- **Autosave timer leak**: pending autosave timer for pane2 is now cancelled when closing the split pane
+- **Circular drag-move**: dragging a folder into one of its own descendants is now blocked in both `dragover` (no drop highlight) and `drop`; previously `copyDirInto` would recurse into the folder while modifying it, creating `a/b/a/b/…` nesting and eventually throwing "state had changed" errors
+- **Folder loop nesting**: removed "deepest expanded folder" fallback from `getTargetDir()`; it caused runaway nesting (`examples/test/examples/test/…`) when the current file's parent wasn't visible in the sidebar, or when no file was open. Now always falls back to the root of the current directory view
+- **Drag-move stale handle error**: `moveEntry` now deletes via `FileSystemHandle.remove()` instead of `sourceParentHandle.removeEntry()`; the parent handle's cached directory listing becomes stale after creating a sibling folder, which caused "state had changed since it was read from disk" errors
+- **Stale sidebar after failed move**: `renderSidebar()` now runs in a `finally` block so it always fires, even on partial failure — prevents the sidebar from misrepresenting disk state and triggering subsequent mis-placed folder creation
+
+### Changed
+- Removed dead code: `_clearPane2`, `_CODE_EXTENSIONS`, `_shouldUseWysiwygMode`
+- Deduplicated `keyup`/`mouseup` cursor-position logic into a shared `_updateCursorPosition` helper
+
+## [0.7.1] — 2026-03-17
+
+### Fixed
+- **Smart target folder**: new file/folder input row now appears inside the parent folder of the active pane's current file (instead of the deepest expanded folder), preventing runaway nesting like `examples/test/examples/test/…`
+- **Mirror sync after delete+recreate**: same-file sync between panes now uses `isSameEntry` (cached as `_panesHaveSameFile`) instead of comparing relative path strings; prevents false mirroring when pane1 deletes and recreates a file at the same path while pane2 still holds the old (deleted) handle
+
+## [0.7.0] — 2026-03-17
+### Added
+- **Inline folder creation**: new folder button now shows an inline input (same UX as new file), replacing the old `prompt()` dialog
+- **Smart target folder**: new file/folder is created inside the last-expanded subfolder in the sidebar, preserving expanded tree state; a hint label shows the target path
+- **Split pane mode**: split button in the sidebar toolbar opens a second editor side-by-side
+  - Each pane has its own file, mode toolbar, history, save/autosave, and focus ring
+  - Sidebar file clicks open in the last-focused pane
+  - Opening a markdown/JSON/CSV file in split mode automatically puts pane 1 in source and pane 2 in preview
+  - Editing in pane 1 syncs content to pane 2 in real time when both panes show the same file
+  - URL and history track only pane 1; back/forward buttons operate on the active pane's history
+  - Draggable resize handle between panes
+
+### Fixed
+- When the same file is open in both panes in source mode, typing in one pane now
+  correctly mirrors text in the other pane (the backdrop highlight was not being
+  updated, making the synced pane appear blank due to `color: transparent` on the textarea)
+- Same-file sync detection now uses relative path instead of bare filename, preventing
+  false matches for files with identical names in different folders
+- Deleting an open file now navigates back to the previously-open file rather than
+  showing an empty editor; if pane2 has no remaining history after deletion, split
+  mode is automatically closed; deleted folders correctly affect all open files inside them
+
 ## [0.6.0] — 2026-03-16
 ### Added
 - URL now tracks cursor column (`&char=N`) alongside line number (`&line=N`)
