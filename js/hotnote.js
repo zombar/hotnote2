@@ -355,7 +355,8 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
     if (dirRelPath === undefined) dirRelPath = '';
     const li = document.createElement('li');
     li.className = 'file-entry';
-    if (entry.kind === 'file' && entry.name === state.currentFilename) {
+    const _entryRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
+    if (entry.kind === 'file' && _entryRelPath === state.currentRelativePath) {
         li.classList.add('active');
     }
 
@@ -525,6 +526,7 @@ async function toggleFolder(li, handle, dirRelPath) {
     childUl.className = 'folder-children';
     if (!entries.length) {
         const emptyLi = document.createElement('li');
+        emptyLi.className = 'folder-empty-placeholder';
         emptyLi.style.cssText = 'color:var(--color-text-tertiary);padding:0.2rem 0.75rem;font-size:0.75rem;font-style:italic';
         emptyLi.textContent = 'Empty folder';
         childUl.appendChild(emptyLi);
@@ -619,6 +621,7 @@ async function refreshTargetFolder(li) {
     childUl.innerHTML = '';
     if (!entries.length) {
         const emptyLi = document.createElement('li');
+        emptyLi.className = 'folder-empty-placeholder';
         emptyLi.style.cssText = 'color:var(--color-text-tertiary);padding:0.2rem 0.75rem;font-size:0.75rem;font-style:italic';
         emptyLi.textContent = 'Empty folder';
         childUl.appendChild(emptyLi);
@@ -637,6 +640,10 @@ function _insertInputRow(id, placeholder, iconKind, onCommit) {
     const existing = document.getElementById(id);
     if (existing) { existing.querySelector('input')?.focus(); return; }
 
+    // Dismiss the sibling input type if open
+    const otherId = id === 'new-file-input-wrap' ? 'new-folder-input-wrap' : 'new-file-input-wrap';
+    document.getElementById(otherId)?.remove();
+
     const target = getTargetDir();
 
     const li = document.createElement('li');
@@ -648,16 +655,27 @@ function _insertInputRow(id, placeholder, iconKind, onCommit) {
         <input type="text" class="new-item-input" placeholder="${escapeHtml(placeholder)}" autocomplete="off">
     </div>`;
 
+    let emptyPlaceholder = null;
     if (target.li) {
         const childUl = target.li.querySelector('.folder-children');
-        if (childUl) childUl.appendChild(li);
-        else document.getElementById('file-list')?.prepend(li);
+        if (childUl) {
+            emptyPlaceholder = childUl.querySelector('.folder-empty-placeholder');
+            if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
+            childUl.appendChild(li);
+        } else {
+            document.getElementById('file-list')?.prepend(li);
+        }
     } else {
         document.getElementById('file-list')?.prepend(li);
     }
 
     const input = li.querySelector('input');
     input.focus();
+
+    const _cancel = () => {
+        li.remove();
+        if (emptyPlaceholder) emptyPlaceholder.style.display = '';
+    };
 
     // Dynamically update file icon as user types (file inputs only)
     if (iconKind === 'file') {
@@ -670,16 +688,16 @@ function _insertInputRow(id, placeholder, iconKind, onCommit) {
     input.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter') {
             const name = input.value.trim();
-            if (!name) { li.remove(); return; }
+            if (!name) { _cancel(); return; }
             li.remove();
             await onCommit(name, target);
         } else if (e.key === 'Escape') {
-            li.remove();
+            _cancel();
         }
     });
 
     input.addEventListener('blur', () => {
-        setTimeout(() => li.remove(), 150);
+        setTimeout(_cancel, 150);
     });
 }
 
@@ -755,10 +773,12 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
         updateTitle();
     }
 
-    // Update sidebar active state
-    document.querySelectorAll('.file-entry').forEach(li => {
-        li.classList.toggle('active', li.querySelector('.name')?.textContent === filename);
-    });
+    // Update sidebar active state — only pane1 drives the sidebar highlight
+    if (paneId === 'pane1') {
+        document.querySelectorAll('.file-entry').forEach(li => {
+            li.classList.toggle('active', !!li._relPath && li._relPath === state.currentRelativePath);
+        });
+    }
 
     // Restore cached positions if this file was visited before
     const _cacheKey = (paneId === 'pane1' ? state.currentRelativePath : ps.currentRelativePath) || filename;

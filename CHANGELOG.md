@@ -2,7 +2,10 @@
 
 ### Fixed
 - **Delete not closing editor**: `_resolveAfterDelete` now wraps `isSameEntry` in try/catch (handle may be invalid post-deletion) and adds a `relPath` fallback so deleting the open file always clears the editor
-- **Create target ignoring last expanded folder**: `getTargetDir()` now tracks `lastExpandedRelPath` in state; the most recently expanded folder is used as the create target, falling back to the active file's parent folder
+- **Create target ignoring last expanded folder**: `getTargetDir()` now tracks `lastExpandedRelPath` in state; the most recently expanded folder is used as the create target, falling back to the active file's parent folder; collapsing a folder walks the target up to the parent
+- **Multiple files highlighted as active**: sidebar active state now compares by full relative path instead of filename; files with identical names in different folders no longer both appear selected
+- **File/folder input boxes not exclusive**: opening a new-file input now dismisses any open new-folder input and vice versa
+- **Empty folder placeholder visible during input**: "Empty folder" text is now hidden while the creation input row is visible in that folder and restored on cancel
 
 ## [0.7.2] — 2026-03-17
 
