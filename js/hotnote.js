@@ -68,6 +68,8 @@ const state = {
     // Autosave
     autosaveEnabled: false,
     autosaveTimer: null,
+    // Last folder explicitly expanded by the user (used as create target)
+    lastExpandedRelPath: null,
     // Relative path from root to current file (tracks subdirs opened via sidebar tree)
     currentRelativePath: null,
     currentLine: 1,
@@ -500,10 +502,16 @@ async function toggleFolder(li, handle, dirRelPath) {
     if (isExpanded) {
         li.querySelector('.folder-children')?.remove();
         li.classList.remove('expanded');
+        if (state.lastExpandedRelPath === dirRelPath) {
+            const parts = dirRelPath.split('/');
+            parts.pop();
+            state.lastExpandedRelPath = parts.length > 0 ? parts.join('/') : null;
+        }
         return;
     }
 
     li.classList.add('expanded');
+    state.lastExpandedRelPath = dirRelPath;
     let entries;
     try {
         entries = await listDirectory(handle);
@@ -560,7 +568,16 @@ function getFileIconSvg(name, kind) {
 function getTargetDir() {
     const expandedList = [...document.querySelectorAll('#file-list .file-entry.expanded')];
 
-    // Prefer the parent folder of the active pane's current file
+    // Prefer the most recently expanded folder (explicit user intent)
+    if (state.lastExpandedRelPath) {
+        const lastLi = expandedList.find(li => li._dirRelPath === state.lastExpandedRelPath);
+        if (lastLi) {
+            return { handle: lastLi._dirHandle, relPath: lastLi._dirRelPath, li: lastLi };
+        }
+        state.lastExpandedRelPath = null; // stale, clear it
+    }
+
+    // Fall back to parent folder of the active pane's current file
     const ps = getPaneState(state.activePaneId);
     if (ps.currentRelativePath) {
         const parts = ps.currentRelativePath.split('/');
@@ -571,14 +588,6 @@ function getTargetDir() {
             if (parentLi) {
                 return { handle: parentLi._dirHandle, relPath: parentLi._dirRelPath, li: parentLi };
             }
-        }
-    }
-
-    // Fall back to deepest expanded folder
-    if (expandedList.length) {
-        const last = expandedList[expandedList.length - 1];
-        if (last._dirHandle) {
-            return { handle: last._dirHandle, relPath: last._dirRelPath || '', li: last };
         }
     }
 
