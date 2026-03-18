@@ -1,3 +1,10 @@
+## [0.7.5] — 2026-03-18
+
+### Added
+- **GitHub icon in navbar**: link to the source repo with tooltip "Review the code"; opens in a new tab
+- **File watcher**: open files in pane1/pane2 are polled every 3 s; if the underlying file changes externally and the pane has no unsaved edits, the content is reloaded automatically with a toast notification
+- **Toast notification system**: `showToast(message)` — non-blocking bottom-right fade-in/out notifications used by the file watcher
+
 ## [0.7.4] — 2026-03-18
 
 ### Added
