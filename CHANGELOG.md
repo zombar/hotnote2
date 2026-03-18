@@ -1,3 +1,13 @@
+## [0.7.4] — 2026-03-18
+
+### Added
+- **Tree view array drill-down**: clicking the `[N items]` count link on any array node in tree view opens the nested data modal; if the array contains objects it renders a table, otherwise shows formatted JSON
+
+### Fixed
+- **Pane mirror sync broken on split open**: `state._panesHaveSameFile` now set immediately when toggling split pane; previously it was never set, so neither source mirroring nor preview sync worked
+- **Nested JSON cells showing `[object Object]`**: `renderCell` now detects object/array values in any column (regardless of inferred type) and renders a clickable `{…}` / "N items" badge
+- **Nested modal drill-down**: clicking a nested badge inside the modal table now navigates into that sub-value with a Back button to return to the parent level; uses event delegation on the modal body so handlers survive re-renders
+
 ## [0.7.3] — 2026-03-17
 
 ### Fixed
