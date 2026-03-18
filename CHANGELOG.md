@@ -1,3 +1,9 @@
+## [0.7.6] — 2026-03-18
+
+### Added
+- **Playwright E2E test suite**: 66 tests covering boot, session restore, sidebar, file browser, editing, view modes (wysiwyg/datasheet/treeview/syntax highlighting), back/forward navigation, split pane, theme toggle, and sidebar resize; run via `make test`
+- **Mock File System Access API** (`tests/helpers/mock-fs.js`): injectable in-memory FS for testing without real disk access; supports `entries()`, `getFileHandle`, `getDirectoryHandle`, `removeEntry`, `createWritable`, and `isSameEntry`
+
 ## [0.7.5] — 2026-03-18
 
 ### Added
