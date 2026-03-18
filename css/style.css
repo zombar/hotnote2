@@ -1510,3 +1510,120 @@ html[data-theme="light"] #update-banner {
     opacity: 1;
     transform: translateY(0);
 }
+
+/* =========================================================================
+   Git Integration — dot indicators, filter bar, diff view
+   ========================================================================= */
+
+/* Sidebar git dot — shown next to modified/untracked file or folder names */
+.git-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-text-secondary);
+    margin-left: 0.35rem;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+/* Git filter bar — sits at the bottom of the sidebar */
+#git-filter-bar {
+    flex-shrink: 0;
+    border-top: 1px solid var(--color-border-primary);
+    padding: 0.375rem 0.625rem;
+    background: var(--color-bg-toolbar);
+}
+#git-filter-bar .btn {
+    width: 100%;
+    justify-content: center;
+    gap: 0.5rem;
+}
+#git-filter-btn.active {
+    background: var(--color-bg-tertiary);
+    border-color: var(--color-border-primary);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-sm), var(--highlight-top), inset 0 -2px 0 var(--color-text-primary);
+}
+.git-change-count {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
+    background: var(--color-bg-tertiary);
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+}
+
+/* Diff view container */
+#diff-view, #diff-view-p2 {
+    flex: 1;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    background: var(--color-bg-primary);
+}
+
+/* Individual diff lines */
+.diff-line {
+    display: flex;
+    align-items: baseline;
+    border-left: 2px solid transparent;
+    padding: 0 0.75rem;
+}
+.diff-gutter {
+    width: 1rem;
+    flex-shrink: 0;
+    user-select: none;
+    color: var(--color-text-tertiary);
+    text-align: center;
+}
+.diff-line code {
+    font-family: inherit;
+    font-size: inherit;
+    white-space: pre-wrap;
+    word-break: break-word;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Added lines: lighter bg + solid left border + bold gutter symbol */
+.diff-add {
+    background: rgba(255, 255, 255, 0.04);
+    border-left-color: var(--color-text-secondary);
+    border-left-style: solid;
+}
+html[data-theme="light"] .diff-add {
+    background: rgba(0, 0, 0, 0.03);
+}
+.diff-add .diff-gutter { color: var(--color-text-primary); font-weight: 700; }
+
+/* Removed lines: darker bg + dashed left border + strikethrough text */
+.diff-del {
+    background: rgba(0, 0, 0, 0.12);
+    border-left-color: var(--color-text-tertiary);
+    border-left-style: dashed;
+}
+html[data-theme="light"] .diff-del {
+    background: rgba(0, 0, 0, 0.06);
+}
+.diff-del code {
+    text-decoration: line-through;
+    color: var(--color-text-secondary);
+}
+
+/* Hunk header */
+.diff-hunk {
+    padding: 0.2rem 0.75rem;
+    color: var(--color-text-tertiary);
+    font-size: 0.75rem;
+    background: var(--color-bg-toolbar);
+    border-bottom: 1px solid var(--color-border-primary);
+    border-top: 1px solid var(--color-border-primary);
+}
+
+/* Status messages */
+.diff-clean, .diff-untracked, .diff-loading {
+    padding: 1rem 0.75rem;
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+}

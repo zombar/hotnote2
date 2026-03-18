@@ -79,6 +79,10 @@ const state = {
     // Search state
     searchActive: false,
     searchQuery: '',
+    // Git state
+    gitAvailable: false,
+    gitChangedPaths: new Set(),
+    gitFilterActive: false,
     // Split pane state
     splitMode: false,
     _panesHaveSameFile: false,

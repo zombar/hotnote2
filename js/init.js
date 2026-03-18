@@ -25,7 +25,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Open folder button
-    document.getElementById('open-folder')?.addEventListener('click', openFolder);
+    document.getElementById('open-folder')?.addEventListener('click', async () => {
+        await openFolder();
+        await refreshGitStatus();
+    });
+
+    // Git changes filter button
+    document.getElementById('git-filter-btn')?.addEventListener('click', () => {
+        state.gitFilterActive = !state.gitFilterActive;
+        updateGitFilterBar();
+        renderSidebar();
+    });
 
     // Wysiwyg link clicks — open in new tab so we don't navigate away
     document.getElementById('wysiwyg')?.addEventListener('click', (e) => {

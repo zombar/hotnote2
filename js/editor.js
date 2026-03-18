@@ -288,11 +288,14 @@ function updateModeToolbar(paneId = 'pane1') {
     }
 
     const sfx = paneId === 'pane2' ? '-p2' : '';
+    const showDiff = state.gitAvailable && !!ps.currentRelativePath;
+
     modeToolbar.innerHTML = `
         <button class="btn btn-sm${ps.editorMode === 'source' ? ' active' : ''}" id="mode-source${sfx}">Source</button>
         ${isMd ? `<button class="btn btn-sm${ps.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg${sfx}">Preview</button>` : ''}
         ${hasDatasheet ? `<button class="btn btn-sm${ps.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet${sfx}">Table</button>` : ''}
         ${hasTree ? `<button class="btn btn-sm${ps.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview${sfx}">Tree</button>` : ''}
+        ${showDiff ? `<button class="btn btn-sm${ps.editorMode === 'diff' ? ' active' : ''}" id="mode-diff${sfx}">Diff</button>` : ''}
         <span id="filename-display${sfx}" class="filename-display">${escapeHtml(ps.currentFilename)}</span>
     `;
 
@@ -300,6 +303,7 @@ function updateModeToolbar(paneId = 'pane1') {
     document.getElementById(`mode-wysiwyg${sfx}`)?.addEventListener('click', () => switchToMode('wysiwyg', paneId));
     document.getElementById(`mode-datasheet${sfx}`)?.addEventListener('click', () => switchToMode('datasheet', paneId));
     document.getElementById(`mode-treeview${sfx}`)?.addEventListener('click', () => switchToMode('treeview', paneId));
+    document.getElementById(`mode-diff${sfx}`)?.addEventListener('click', () => switchToMode('diff', paneId));
 }
 
 async function resolveLocalImages(container) {
@@ -351,6 +355,7 @@ function switchToMode(mode, paneId = 'pane1', content) {
     const datasheet = getPaneEl('s3-datasheet', paneId);
     const treeview = getPaneEl('s3-treeview', paneId);
     const imageViewer = getPaneEl('image-viewer', paneId);
+    const diffView = getPaneEl('diff-view', paneId);
 
     // Hide all panels
     if (wrap) wrap.style.display = 'none';
@@ -358,6 +363,7 @@ function switchToMode(mode, paneId = 'pane1', content) {
     if (datasheet) datasheet.style.display = 'none';
     if (treeview) treeview.style.display = 'none';
     if (imageViewer) imageViewer.style.display = 'none';
+    if (diffView) diffView.style.display = 'none';
 
     const currentContent = content !== undefined ? content : (textarea ? textarea.value : '');
 
@@ -416,6 +422,24 @@ function switchToMode(mode, paneId = 'pane1', content) {
                 imageViewer.innerHTML = ps.imageObjectUrl
                     ? `<img src="${ps.imageObjectUrl}" alt="${escapeHtml(ps.currentFilename)}">`
                     : `<p style="color:var(--color-text-tertiary)">Failed to load image</p>`;
+            }
+            break;
+
+        case 'diff':
+            if (diffView) {
+                diffView.style.display = 'block';
+                diffView.innerHTML = '<div class="diff-loading">Loading diff\u2026</div>';
+                const _relPath = ps.currentRelativePath;
+                const _currentContent = textarea ? textarea.value : '';
+                readHeadBlob(state.rootHandle, _relPath).then(headContent => {
+                    if (ps.editorMode !== 'diff') return; // mode switched away
+                    const status = headContent === null ? 'untracked' : 'modified';
+                    diffView.innerHTML = renderDiff(headContent ?? '', _currentContent, status);
+                }).catch(() => {
+                    if (ps.editorMode === 'diff') {
+                        diffView.innerHTML = '<div class="diff-clean">Could not load HEAD content</div>';
+                    }
+                });
             }
             break;
     }

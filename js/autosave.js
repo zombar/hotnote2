@@ -64,6 +64,7 @@ function _scrollElForMode(mode, paneId = 'pane1') {
     if (mode === 'treeview') return getPaneEl('s3-treeview', paneId);
     if (mode === 'datasheet') return getPaneEl('s3-datasheet', paneId);
     if (mode === 'image') return getPaneEl('image-viewer', paneId);
+    if (mode === 'diff') return getPaneEl('diff-view', paneId);
     return null;
 }
 
@@ -86,6 +87,8 @@ async function saveFile(silent = false, paneId = null) {
             if (saveBtn) { saveBtn.classList.remove('dirty'); saveBtn.disabled = true; }
         }
         if (silent) animateAutosaveLabel();
+        // Refresh git status so dots update after save
+        if (state.gitAvailable) refreshGitStatus();
     } catch (err) {
         if (!silent) alert(`Failed to save: ${err.message}`);
         else console.error('Autosave failed:', err);

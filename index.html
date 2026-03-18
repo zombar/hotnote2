@@ -125,6 +125,11 @@
                 </label>
             </div>
             <ul id="file-list"></ul>
+            <div id="git-filter-bar" style="display:none">
+                <button class="btn btn-sm" id="git-filter-btn">
+                    <span class="git-change-count">0</span> changes
+                </button>
+            </div>
         </aside>
         <div id="resize-handle"></div>
         <div id="editor-container">
@@ -139,6 +144,7 @@
                 <div id="s3-datasheet" style="display:none"></div>
                 <div id="s3-treeview" style="display:none"></div>
                 <div id="image-viewer" style="display:none"></div>
+                <div id="diff-view" style="display:none"></div>
             </section>
             <div id="split-resize-handle" style="display:none"></div>
             <section class="pane" id="pane2" style="display:none">
@@ -152,6 +158,7 @@
                 <div id="s3-datasheet-p2" style="display:none"></div>
                 <div id="s3-treeview-p2" style="display:none"></div>
                 <div id="image-viewer-p2" style="display:none"></div>
+                <div id="diff-view-p2" style="display:none"></div>
             </section>
         </div>
     </main>
@@ -183,6 +190,8 @@
 <script src="js/autosave.js"></script>
 <script src="js/split-pane.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/git.js"></script>
+<script src="js/diff.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/sidebar.js"></script>
 <script src="js/init.js"></script>

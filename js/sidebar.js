@@ -44,6 +44,18 @@ async function renderSidebar() {
         return;
     }
 
+    // Git filter: only show files/folders that have changes
+    if (state.gitFilterActive && state.gitChangedPaths.size > 0) {
+        const baseDirRelPath = state.pathStack.slice(1).map(p => p.name).join('/');
+        entries = entries.filter(e => {
+            const rp = baseDirRelPath ? baseDirRelPath + '/' + e.name : e.name;
+            if (e.kind === 'directory') {
+                return [...state.gitChangedPaths].some(p => p.startsWith(rp + '/'));
+            }
+            return state.gitChangedPaths.has(rp);
+        });
+    }
+
     if (!entries.length) {
         list.innerHTML = '<li style="color:var(--color-text-tertiary);padding:.3rem .75rem;font-size:.8rem;font-style:italic">Empty folder</li>';
         return;
@@ -55,6 +67,24 @@ async function renderSidebar() {
         const li = renderFileEntry(entry, state.currentDirHandle, baseDirRelPath);
         list.appendChild(li);
     }
+}
+
+function updateGitFilterBar() {
+    const bar = document.getElementById('git-filter-bar');
+    if (!bar) return;
+    const count = state.gitChangedPaths.size;
+    if (!state.gitAvailable || count === 0) {
+        bar.style.display = 'none';
+        if (state.gitFilterActive) {
+            state.gitFilterActive = false;
+        }
+        return;
+    }
+    bar.style.display = '';
+    const countEl = bar.querySelector('.git-change-count');
+    if (countEl) countEl.textContent = count;
+    const btn = bar.querySelector('#git-filter-btn');
+    if (btn) btn.classList.toggle('active', state.gitFilterActive);
 }
 
 const CHEVRON_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
@@ -73,14 +103,21 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
     const deleteBtn = `<button class="delete-btn" title="Delete ${escapeHtml(entry.name)}" aria-label="Delete ${escapeHtml(entry.name)}">${DELETE_SVG}</button>`;
 
     if (entry.kind === 'directory') {
+        const folderRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
+        const hasDirChange = state.gitAvailable &&
+            [...state.gitChangedPaths].some(p => p.startsWith(folderRelPath + '/'));
+        const gitDot = hasDirChange
+            ? '<span class="git-dot" aria-label="modified"></span>'
+            : '';
+
         li.innerHTML = `<div class="file-entry-row">
             <button class="folder-toggle" aria-label="Toggle ${escapeHtml(entry.name)}">${CHEVRON_SVG}</button>
             <span class="icon">${icon}</span>
             <span class="name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+            ${gitDot}
             ${deleteBtn}
         </div>`;
 
-        const folderRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
         // Store dir handle on the li for getTargetDir()
         li._dirHandle = entry.handle;
         li._dirRelPath = folderRelPath;
@@ -103,15 +140,21 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
             ? `${escapeHtml(entry.name)} — ${reason}`
             : escapeHtml(entry.name);
 
+        const fileRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
+        const hasFileChange = state.gitAvailable && state.gitChangedPaths.has(fileRelPath);
+        const gitDotFile = hasFileChange
+            ? '<span class="git-dot" aria-label="modified"></span>'
+            : '';
+
         li.innerHTML = `<div class="file-entry-row" title="${tooltip}">
             <span class="toggle-spacer"></span>
             <span class="icon">${icon}</span>
             <span class="name">${escapeHtml(entry.name)}</span>
+            ${gitDotFile}
             ${deleteBtn}
         </div>`;
 
         if (!unopenable) {
-            const fileRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
             li._relPath = fileRelPath;
             li.querySelector('.file-entry-row').addEventListener('click', async (e) => {
                 if (e.target.closest('.delete-btn')) return;
