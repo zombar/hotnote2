@@ -59,6 +59,7 @@ const state = {
     datasheetPageSize: DATASHEET_PAGE_SIZE,
     treeviewData: null,
     treeviewCollapsed: new Set(),
+    nestedStack: [],  // drill-in navigation: [{mode, title, datasheetData, datasheetSchema, datasheetPage, treeviewData, treeviewCollapsed}]
     // Navigation: [{handle, name}]
     pathStack: [],
     // File history for back/forward navigation
@@ -93,6 +94,7 @@ const state = {
         datasheetPageSize: DATASHEET_PAGE_SIZE,
         treeviewData: null,
         treeviewCollapsed: new Set(),
+        nestedStack: [],
         fileHistory: [],
         fileHistoryIndex: -1,
         filePositionCache: {},
@@ -103,13 +105,6 @@ const state = {
         currentChar: 1,
         lastModifiedTime: null,
     },
-    // Modal pane state — used when rendering a nested table inside the drill-down modal
-    modal: {
-        datasheetData: null,
-        datasheetSchema: null,
-        datasheetPage: 1,
-        datasheetPageSize: DATASHEET_PAGE_SIZE,
-    },
 };
 
 // =========================================================================
@@ -117,14 +112,11 @@ const state = {
 // =========================================================================
 
 function getPaneEl(baseId, paneId) {
-    if (paneId === 'modal') return document.getElementById('nested-body');
     return document.getElementById(paneId === 'pane1' ? baseId : baseId + '-p2');
 }
 
 function getPaneState(paneId) {
-    if (paneId === 'pane2') return state.pane2;
-    if (paneId === 'modal') return state.modal;
-    return state;
+    return paneId === 'pane2' ? state.pane2 : state;
 }
 
 // =========================================================================
@@ -935,6 +927,7 @@ async function navigateHistory(delta) {
 
 function determineInitialMode(ext, content, paneState) {
     const ps = paneState || state;
+    ps.nestedStack = [];
 
     // Image files
     if (IMAGE_EXTENSIONS.has(ext)) {
@@ -1331,6 +1324,9 @@ function _scrollElForMode(mode, paneId = 'pane1') {
 
 function switchToMode(mode, paneId = 'pane1', content) {
     const ps = getPaneState(paneId);
+
+    // Clear nested navigation when user explicitly changes mode
+    ps.nestedStack = [];
 
     // Save scroll position of current panel before switching
     const prevEl = _scrollElForMode(ps.editorMode, paneId);
@@ -1912,9 +1908,12 @@ function _renderDatasheet(paneId = 'pane1') {
     const endRow = Math.min(startRow + pageSize, totalRows);
     const visibleRows = data.slice(startRow, endRow);
 
-    const sfx = paneId === 'pane2' ? '-p2' : paneId === 'modal' ? '-modal' : '';
+    const sfx = paneId === 'pane2' ? '-p2' : '';
+    const backEntry = ps.nestedStack && ps.nestedStack.length > 0
+        ? ps.nestedStack[ps.nestedStack.length - 1] : null;
     container.innerHTML = `
         <div class="s3-datasheet-toolbar">
+            ${backEntry ? `<button class="btn btn-sm s3-ds-back" id="s3-ds-back${sfx}">← ${escapeHtml(backEntry.title)}</button>` : ''}
             <span class="s3-datasheet-info">
                 <span><b id="s3-ds-row-count${sfx}">${totalRows}</b> rows</span>
                 <span><b id="s3-ds-col-count${sfx}">${schema.columns.length}</b> cols</span>
@@ -1963,6 +1962,9 @@ function _renderDatasheet(paneId = 'pane1') {
     // Render aggregations
     renderAggregations(paneId);
 
+    // Back button (nested drill-in navigation)
+    document.getElementById(`s3-ds-back${sfx}`)?.addEventListener('click', () => nestedBack(paneId));
+
     // Pagination buttons
     document.getElementById(`s3-ds-prev${sfx}`)?.addEventListener('click', () => {
         if (ps.datasheetPage > 1) { ps.datasheetPage--; _renderDatasheet(paneId); }
@@ -1976,14 +1978,19 @@ function _renderDatasheet(paneId = 'pane1') {
         el.addEventListener('click', () => {
             const rowIdx = parseInt(el.dataset.rowIdx, 10);
             const colKey = el.dataset.colKey;
-            openNestedModal(rowIdx, colKey, paneId);
+            const val = ps.datasheetData?.[rowIdx]?.[colKey];
+            if (Array.isArray(val) && detectDatasheetMode(JSON.stringify(val)).isDatasheet) {
+                drillIntoNested(val, `${colKey} [Row ${rowIdx + 1}]`, paneId);
+            } else {
+                openNestedModalValue(val, `${colKey} [Row ${rowIdx + 1}]`);
+            }
         });
     });
 }
 
 function renderAggregations(paneId = 'pane1') {
     const ps = getPaneState(paneId);
-    const sfx = paneId === 'pane2' ? '-p2' : paneId === 'modal' ? '-modal' : '';
+    const sfx = paneId === 'pane2' ? '-p2' : '';
     const tfoot = document.getElementById(`s3-ds-tfoot${sfx}`);
     if (!tfoot || !ps.datasheetData || !ps.datasheetSchema) return;
 
@@ -2034,14 +2041,18 @@ function renderTreeView(paneId = 'pane1') {
         });
     });
 
-    // Attach array-link handlers (open nested modal)
+    // Attach array-link handlers — drill in-pane for tables, modal for raw values
     container.querySelectorAll('.tree-array-link').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             const path = el.dataset.treePath;
             const val = _getValueAtPath(ps.treeviewData, path);
             const label = path.replace(/^root\.?/, '').split(/\.|\[|\]/).filter(Boolean).pop() || 'root';
-            openNestedModalValue(val, label);
+            if (Array.isArray(val) && detectDatasheetMode(JSON.stringify(val)).isDatasheet) {
+                drillIntoNested(val, label, paneId);
+            } else {
+                openNestedModalValue(val, label);
+            }
         });
     });
 }
@@ -2143,54 +2154,87 @@ function toggleTreeNode(path, paneId = 'pane1') {
 let _nestedModalStack = [];
 
 function openNestedModalValue(value, title) {
-    _nestedModalStack = [{ value, title, page: 1 }];
+    _nestedModalStack = [{ value, title }];
     _renderNestedModalFrame();
     document.getElementById('nested-modal')?.classList.add('open');
 }
 
-function openNestedModal(rowIdx, colKey, paneId = 'pane1') {
-    const ps = getPaneState(paneId);
-    if (!ps.datasheetData) return;
-    const row = ps.datasheetData[rowIdx];
-    if (!row || !(colKey in row)) return;
-    if (paneId === 'modal') {
-        // Drilling deeper from within the modal — save current page before pushing
-        const current = _nestedModalStack[_nestedModalStack.length - 1];
-        if (current) current.page = state.modal.datasheetPage;
-        _nestedModalStack.push({ value: row[colKey], title: `${colKey} [Row ${rowIdx + 1}]`, page: 1 });
-        _renderNestedModalFrame();
-    } else {
-        openNestedModalValue(row[colKey], `${colKey} [Row ${rowIdx + 1}]`);
-    }
-}
-
 function _renderNestedModalFrame() {
-    const { value, title, page } = _nestedModalStack[_nestedModalStack.length - 1];
+    const { value, title } = _nestedModalStack[_nestedModalStack.length - 1];
+    const body = document.getElementById('nested-body');
     const titleEl = document.getElementById('nested-title');
     const backBtn = document.getElementById('nested-modal-back');
-
+    if (!body) return;
     if (titleEl) titleEl.textContent = title;
     if (backBtn) backBtn.style.display = _nestedModalStack.length > 1 ? '' : 'none';
-
-    if (Array.isArray(value) && value.length > 0 && detectDatasheetMode(JSON.stringify(value)).isDatasheet) {
-        state.modal.datasheetData = value;
-        state.modal.datasheetSchema = inferSchema(value);
-        state.modal.datasheetPage = page ?? 1;
-        state.modal.datasheetPageSize = DATASHEET_PAGE_SIZE;
-        _renderDatasheet('modal');
-    } else {
-        const body = document.getElementById('nested-body');
-        if (body) body.innerHTML = `<pre class="s3-nested-json">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
-    }
+    body.innerHTML = `<pre class="s3-nested-json">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
 }
 
 function closeNestedModal() {
     const modal = document.getElementById('nested-modal');
     if (modal) modal.classList.remove('open');
     _nestedModalStack = [];
-    state.modal.datasheetData = null;
-    state.modal.datasheetSchema = null;
-    state.modal.datasheetPage = 1;
+}
+
+// =========================================================================
+// In-pane nested table navigation
+// =========================================================================
+
+function drillIntoNested(value, title, paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    ps.nestedStack.push({
+        title,
+        mode: ps.editorMode,
+        datasheetData: ps.datasheetData,
+        datasheetSchema: ps.datasheetSchema,
+        datasheetPage: ps.datasheetPage,
+        treeviewData: ps.treeviewData,
+        treeviewCollapsed: ps.treeviewCollapsed,
+    });
+    ps.datasheetData = value;
+    ps.datasheetSchema = inferSchema(value);
+    ps.datasheetPage = 1;
+    ps.editorMode = 'datasheet';
+
+    const wrap = getPaneEl('source-editor-wrap', paneId);
+    const wysiwyg = getPaneEl('wysiwyg', paneId);
+    const datasheet = getPaneEl('s3-datasheet', paneId);
+    const treeview = getPaneEl('s3-treeview', paneId);
+    const imageViewer = getPaneEl('image-viewer', paneId);
+    if (wrap) wrap.style.display = 'none';
+    if (wysiwyg) wysiwyg.style.display = 'none';
+    if (treeview) treeview.style.display = 'none';
+    if (imageViewer) imageViewer.style.display = 'none';
+    if (datasheet) { datasheet.style.display = 'flex'; _renderDatasheet(paneId); }
+}
+
+function nestedBack(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    if (!ps.nestedStack.length) return;
+    const entry = ps.nestedStack.pop();
+    ps.datasheetData = entry.datasheetData;
+    ps.datasheetSchema = entry.datasheetSchema;
+    ps.datasheetPage = entry.datasheetPage;
+    ps.treeviewData = entry.treeviewData;
+    ps.treeviewCollapsed = entry.treeviewCollapsed;
+    ps.editorMode = entry.mode;
+
+    const wrap = getPaneEl('source-editor-wrap', paneId);
+    const wysiwyg = getPaneEl('wysiwyg', paneId);
+    const datasheet = getPaneEl('s3-datasheet', paneId);
+    const treeview = getPaneEl('s3-treeview', paneId);
+    const imageViewer = getPaneEl('image-viewer', paneId);
+    if (wrap) wrap.style.display = 'none';
+    if (wysiwyg) wysiwyg.style.display = 'none';
+    if (datasheet) datasheet.style.display = 'none';
+    if (treeview) treeview.style.display = 'none';
+    if (imageViewer) imageViewer.style.display = 'none';
+
+    if (entry.mode === 'treeview') {
+        if (treeview) { treeview.style.display = 'block'; renderTreeView(paneId); }
+    } else if (entry.mode === 'datasheet') {
+        if (datasheet) { datasheet.style.display = 'flex'; _renderDatasheet(paneId); }
+    }
 }
 
 // =========================================================================
@@ -2472,28 +2516,13 @@ document.addEventListener('DOMContentLoaded', () => {
     autoCollapseMQ.addEventListener('change', handleAutoCollapse);
     handleAutoCollapse(autoCollapseMQ);
 
-    // Nested modal close / back / drill-down (event delegation on body)
+    // Nested modal close / back
     document.getElementById('nested-modal-close')?.addEventListener('click', closeNestedModal);
     document.getElementById('nested-modal-back')?.addEventListener('click', () => {
-        if (_nestedModalStack.length > 1) {
-            _nestedModalStack.pop();
-            _renderNestedModalFrame();
-        }
+        if (_nestedModalStack.length > 1) { _nestedModalStack.pop(); _renderNestedModalFrame(); }
     });
     document.getElementById('nested-modal')?.addEventListener('click', (e) => {
         if (e.target === e.currentTarget) closeNestedModal();
-    });
-    document.getElementById('nested-body')?.addEventListener('click', (e) => {
-        const badge = e.target.closest('.s3-ds-nested');
-        if (!badge || !_nestedModalStack.length) return;
-        const { value } = _nestedModalStack[_nestedModalStack.length - 1];
-        if (!Array.isArray(value)) return;
-        const rIdx = parseInt(badge.dataset.rowIdx, 10);
-        const cKey = badge.dataset.colKey;
-        if (value[rIdx] === null || value[rIdx] === undefined) return;
-        const innerVal = value[rIdx][cKey];
-        _nestedModalStack.push({ value: innerVal, title: `${cKey} [Row ${rIdx + 1}]` });
-        _renderNestedModalFrame();
     });
 
     // Initial empty state — hide sidebar until a folder is opened

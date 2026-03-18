@@ -355,20 +355,21 @@ test.describe('treeview → nested table navigation', () => {
         expect(text).toContain('items');
     });
 
-    test('clicking array-of-objects link opens modal with a table', async ({ page }) => {
+    test('clicking array-of-objects link drills in-pane showing a table', async ({ page }) => {
         await openMockFolder(page, { 'depts.json': DEPARTMENTS_DATA });
         await openFile(page, 'depts.json');
         await page.locator('#s3-treeview .tree-array-link').first().click();
-        await expect(page.locator('#nested-modal')).toBeVisible();
-        // Modal should render a table, not raw JSON
-        await expect(page.locator('#nested-body table')).toBeVisible();
+        // Treeview hidden, datasheet fills the pane; no modal
+        await expect(page.locator('#s3-treeview')).toBeHidden();
+        await expect(page.locator('#s3-datasheet')).toBeVisible();
+        await expect(page.locator('#nested-modal')).toBeHidden();
     });
 
     test('nested table has correct column headers', async ({ page }) => {
         await openMockFolder(page, { 'depts.json': DEPARTMENTS_DATA });
         await openFile(page, 'depts.json');
         await page.locator('#s3-treeview .tree-array-link').first().click();
-        const headers = await page.locator('#nested-body th').allTextContents();
+        const headers = await page.locator('#s3-datasheet th').allTextContents();
         expect(headers).toContain('name');
         expect(headers).toContain('role');
         expect(headers).toContain('level');
@@ -378,13 +379,22 @@ test.describe('treeview → nested table navigation', () => {
         await openMockFolder(page, { 'depts.json': DEPARTMENTS_DATA });
         await openFile(page, 'depts.json');
         await page.locator('#s3-treeview .tree-array-link').first().click();
-        const cells = await page.locator('#nested-body td').allTextContents();
+        const cells = await page.locator('#s3-datasheet td').allTextContents();
         expect(cells.some(c => c.includes('Alice'))).toBeTruthy();
         expect(cells.some(c => c.includes('Lead'))).toBeTruthy();
     });
 
-    test('nested table has pagination controls', async ({ page }) => {
-        // Build a dept with enough members to need pagination
+    test('back button returns to treeview', async ({ page }) => {
+        await openMockFolder(page, { 'depts.json': DEPARTMENTS_DATA });
+        await openFile(page, 'depts.json');
+        await page.locator('#s3-treeview .tree-array-link').first().click();
+        await expect(page.locator('#s3-datasheet')).toBeVisible();
+        await page.locator('#s3-ds-back').click();
+        await expect(page.locator('#s3-treeview')).toBeVisible();
+        await expect(page.locator('#s3-datasheet')).toBeHidden();
+    });
+
+    test('nested table has pagination controls for large arrays', async ({ page }) => {
         const BIG_DEPT = JSON.stringify({
             name: 'Engineering',
             members: Array.from({ length: 60 }, (_, i) => ({ id: i + 1, name: `Person ${i + 1}`, level: (i % 5) + 1 })),
@@ -392,11 +402,11 @@ test.describe('treeview → nested table navigation', () => {
         await openMockFolder(page, { 'big.json': BIG_DEPT });
         await openFile(page, 'big.json');
         await page.locator('#s3-treeview .tree-array-link').first().click();
-        await expect(page.locator('#nested-modal')).toBeVisible();
-        await expect(page.locator('#s3-ds-prev-modal')).toBeDisabled();
-        await expect(page.locator('#s3-ds-next-modal')).toBeEnabled();
-        await page.locator('#s3-ds-next-modal').click();
-        await expect(page.locator('#s3-ds-prev-modal')).toBeEnabled();
+        await expect(page.locator('#s3-datasheet')).toBeVisible();
+        await expect(page.locator('#s3-ds-prev')).toBeDisabled();
+        await expect(page.locator('#s3-ds-next')).toBeEnabled();
+        await page.locator('#s3-ds-next').click();
+        await expect(page.locator('#s3-ds-prev')).toBeEnabled();
     });
 });
 

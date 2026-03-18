@@ -1,7 +1,7 @@
 ## [0.7.8] — 2026-03-18
 
 ### Changed
-- **Nested modal uses full datasheet renderer**: clicking an array-of-objects cell in any table or treeview now opens a paginated, aggregation-capable table in the drill-down modal (via `_renderDatasheet('modal')`) instead of a plain unpaginated table; the Back button restores the previous page position; the X button returns to the original JSON view
+- **Nested tables fill the pane**: clicking an array-of-objects link in treeview or a nested-array cell in datasheet now replaces the pane content with a full paginated table (using `_renderDatasheet`) instead of opening a modal overlay; a `← Back` button in the table toolbar returns to the previous view (treeview or parent table); non-table nested values (raw arrays, objects) still open in the compact modal
 
 ## [0.7.7] — 2026-03-18
 
