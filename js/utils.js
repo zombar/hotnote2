@@ -80,6 +80,21 @@ async function listDirectory(dirHandle) {
     return [...dirs, ...files];
 }
 
+async function getAllFiles(dirHandle, basePath, results = []) {
+    for await (const [name, handle] of dirHandle.entries()) {
+        if (name.startsWith('.')) continue;
+        const relPath = basePath ? basePath + '/' + name : name;
+        if (handle.kind === 'directory') {
+            await getAllFiles(handle, relPath, results);
+        } else {
+            let size = 0;
+            try { size = (await handle.getFile()).size; } catch (_e) { /* ignore */ }
+            results.push({ name, handle, kind: 'file', relPath, size });
+        }
+    }
+    return results;
+}
+
 async function createFile(name, dirHandle) {
     const dh = dirHandle || state.currentDirHandle;
     if (!dh) return null;

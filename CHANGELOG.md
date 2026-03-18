@@ -1,3 +1,9 @@
+## [0.8.0] — 2026-03-18
+
+### Added
+- **Sidebar search**: magnifying-glass icon in sidebar toolbar opens a search panel; type to filter by filename; check "Search content" to also match file contents; click a result to open the file; click the icon again to dismiss and restore the file tree
+- **E2E tests**: 8 new search tests (suite grows to 111)
+
 ## [0.7.9] — 2026-03-18
 
 ### Changed

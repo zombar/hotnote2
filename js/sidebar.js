@@ -476,3 +476,99 @@ function initResizeHandle() {
         }
     });
 }
+
+// =========================================================================
+// Search
+// =========================================================================
+
+function toggleSearch() {
+    if (state.searchActive) {
+        clearSearch();
+    } else {
+        state.searchActive = true;
+        document.getElementById('search-panel').classList.remove('hidden');
+        document.getElementById('search-btn').classList.add('active');
+        document.getElementById('search-input').focus();
+    }
+}
+
+function clearSearch() {
+    state.searchActive = false;
+    state.searchQuery = '';
+    document.getElementById('search-panel').classList.add('hidden');
+    document.getElementById('search-btn').classList.remove('active');
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-content-toggle').checked = false;
+    renderSidebar();
+}
+
+async function performSearch(query, includeContent) {
+    state.searchQuery = query;
+    if (!state.rootHandle || !query.trim()) {
+        renderSidebar();
+        return;
+    }
+    const list = document.getElementById('file-list');
+    list.innerHTML = '<li class="search-status">Searching…</li>';
+
+    const allFiles = await getAllFiles(state.rootHandle, '');
+
+    const nameMatches = allFiles.filter(f =>
+        f.name.toLowerCase().includes(query.toLowerCase()) &&
+        !isUnopenable(f)
+    );
+
+    let results = nameMatches;
+
+    if (includeContent) {
+        const contentHits = new Set();
+        await Promise.all(allFiles.map(async (f) => {
+            if (isUnopenable(f) || f.size > MAX_OPENABLE_SIZE) return;
+            try {
+                const text = await (await f.handle.getFile()).text();
+                if (text.toLowerCase().includes(query.toLowerCase())) {
+                    contentHits.add(f.relPath);
+                }
+            } catch (_e) { /* ignore unreadable files */ }
+        }));
+        const nameHitPaths = new Set(nameMatches.map(r => r.relPath));
+        const contentOnly = allFiles.filter(f =>
+            contentHits.has(f.relPath) && !nameHitPaths.has(f.relPath) && !isUnopenable(f)
+        );
+        results = [...nameMatches, ...contentOnly];
+        results.sort((a, b) => a.relPath.localeCompare(b.relPath));
+    }
+
+    renderSearchResults(results);
+}
+
+function renderSearchResults(results) {
+    const list = document.getElementById('file-list');
+    list.innerHTML = '';
+    if (!results.length) {
+        list.innerHTML = '<li class="search-status">No results</li>';
+        return;
+    }
+    for (const result of results) {
+        const li = document.createElement('li');
+        li.className = 'file-entry search-result';
+        const icon = getFileIconSvg(result.name, 'file');
+        const dirPath = result.relPath.includes('/')
+            ? result.relPath.substring(0, result.relPath.lastIndexOf('/'))
+            : '';
+        li.innerHTML = `<div class="file-entry-row">
+            <div class="result-name-row">
+                <span class="icon">${icon}</span>
+                <span class="name">${escapeHtml(result.name)}</span>
+            </div>
+            ${dirPath ? `<div class="result-path">${escapeHtml(dirPath)}</div>` : ''}
+        </div>`;
+        li.addEventListener('click', async () => {
+            state.currentRelativePath = result.relPath;
+            await openFile(result.handle, result.name, true, state.activePaneId);
+            clearSearch();
+        });
+        if (result.relPath === state.currentRelativePath) li.classList.add('active');
+        list.appendChild(li);
+    }
+}

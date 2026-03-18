@@ -58,6 +58,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('forward-btn')?.addEventListener('click', () => navigateHistory(1));
     document.getElementById('split-pane-btn')?.addEventListener('click', toggleSplitPane);
 
+    // Search
+    let searchDebounceTimer = null;
+    document.getElementById('search-btn')?.addEventListener('click', toggleSearch);
+    document.getElementById('search-input')?.addEventListener('input', (e) => {
+        clearTimeout(searchDebounceTimer);
+        const includeContent = document.getElementById('search-content-toggle')?.checked ?? false;
+        const delay = includeContent ? 500 : 300;
+        searchDebounceTimer = setTimeout(() => performSearch(e.target.value, includeContent), delay);
+    });
+    document.getElementById('search-content-toggle')?.addEventListener('change', () => {
+        const query = document.getElementById('search-input')?.value ?? '';
+        const includeContent = document.getElementById('search-content-toggle')?.checked ?? false;
+        performSearch(query, includeContent);
+    });
+
     // Pane focus tracking
     function setupPaneFocus(paneId) {
         const paneEl = document.getElementById(paneId);
