@@ -1466,7 +1466,7 @@ async function renderWelcomeScreen() {
     el.innerHTML = `
         <div class="welcome-hero">
             <p class="welcome-tagline">Local-first code &amp; markdown editor.<br>
-            No backend. No build step. Files stay on your machine.</p>
+            No backend, no account, no cloud. Works directly with your filesystem.</p>
             <ul class="welcome-features">
                 <li>Open any local folder with <b>Open Folder</b> above</li>
                 <li>Edit code, markdown and JSON — view images &amp; more</li>
