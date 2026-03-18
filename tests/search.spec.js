@@ -71,11 +71,11 @@ test('clicking search icon again closes search and restores file tree', async ({
     await expect(page.locator('#file-list li.file-entry')).not.toHaveCount(0);
 });
 
-test('clicking search result opens file and closes search', async ({ page }) => {
+test('clicking search result opens file and keeps search open', async ({ page }) => {
     await page.locator('#search-btn').click();
     await page.locator('#search-input').fill('notes.md');
     await page.locator('#file-list li.search-result').first().waitFor({ state: 'visible' });
     await page.locator('#file-list li.search-result').first().click();
-    await expect(page.locator('#search-panel')).not.toBeVisible();
+    await expect(page.locator('#search-panel')).toBeVisible();
     await expect(page.locator('#mode-toolbar')).toBeVisible();
 });

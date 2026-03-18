@@ -566,7 +566,6 @@ function renderSearchResults(results) {
         li.addEventListener('click', async () => {
             state.currentRelativePath = result.relPath;
             await openFile(result.handle, result.name, true, state.activePaneId);
-            clearSearch();
         });
         if (result.relPath === state.currentRelativePath) li.classList.add('active');
         list.appendChild(li);
