@@ -1,0 +1,52 @@
+[
+  {
+    "id": 1,
+    "name": "Alice Nguyen",
+    "role": "Engineering Lead",
+    "active": true,
+    "score": 98,
+    "joined": "2021-03-15T09:00:00Z",
+    "tags": ["backend", "infra", "on-call"],
+    "address": { "city": "San Francisco", "country": "US" }
+  },
+  {
+    "id": 2,
+    "name": "Bob Martínez",
+    "role": "Designer",
+    "active": true,
+    "score": 87,
+    "joined": "2022-07-01T09:00:00Z",
+    "tags": ["ui", "figma"],
+    "address": { "city": "Austin", "country": "US" }
+  },
+  {
+    "id": 3,
+    "name": "Carol Singh",
+    "role": "Product Manager",
+    "active": false,
+    "score": 91,
+    "joined": "2020-11-20T09:00:00Z",
+    "tags": ["roadmap", "stakeholders", "metrics"],
+    "address": { "city": "London", "country": "UK" }
+  },
+  {
+    "id": 4,
+    "name": "David Kim",
+    "role": "Frontend Engineer",
+    "active": true,
+    "score": 84,
+    "joined": "2023-01-09T09:00:00Z",
+    "tags": ["react", "css", "a11y"],
+    "address": { "city": "Seoul", "country": "KR" }
+  },
+  {
+    "id": 5,
+    "name": "Eva Rossi",
+    "role": "Data Engineer",
+    "active": true,
+    "score": 95,
+    "joined": "2021-09-14T09:00:00Z",
+    "tags": ["sql", "spark", "pipelines", "on-call"],
+    "address": { "city": "Milan", "country": "IT" }
+  }
+]
