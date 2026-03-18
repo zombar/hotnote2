@@ -1605,6 +1605,7 @@ function toggleSplitPane() {
             state.pane2.currentFilename = ps1.currentFilename;
             state.pane2.currentRelativePath = ps1.currentRelativePath;
             state.pane2.autosaveEnabled = ps1.autosaveEnabled;
+            state._panesHaveSameFile = true;
 
             const isPreviewable = ['md', 'json', 'csv'].includes(ext) || isImage;
             if (isPreviewable) {
@@ -1863,6 +1864,14 @@ function renderCell(value, type, rowIdx, colKey) {
             return `<span class="s3-ds-nested" data-row-idx="${rowIdx}" data-col-key="${escapeHtml(colKey)}" title="Click to view">
                 <span class="s3-ds-nested-text">{…}</span></span>`;
         default:
+            if (Array.isArray(value)) {
+                return `<span class="s3-ds-nested" data-row-idx="${rowIdx}" data-col-key="${escapeHtml(colKey)}" title="Click to view">
+                    <span class="s3-ds-nested-text">${value.length} items</span></span>`;
+            }
+            if (typeof value === 'object' && value !== null) {
+                return `<span class="s3-ds-nested" data-row-idx="${rowIdx}" data-col-key="${escapeHtml(colKey)}" title="Click to view">
+                    <span class="s3-ds-nested-text">{…}</span></span>`;
+            }
             return escapeHtml(String(value));
     }
 }
@@ -2009,6 +2018,17 @@ function renderTreeView(paneId = 'pane1') {
             toggleTreeNode(el.dataset.treePath, paneId);
         });
     });
+
+    // Attach array-link handlers (open nested modal)
+    container.querySelectorAll('.tree-array-link').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const path = el.dataset.treePath;
+            const val = _getValueAtPath(ps.treeviewData, path);
+            const label = path.replace(/^root\.?/, '').split(/\.|\[|\]/).filter(Boolean).pop() || 'root';
+            openNestedModalValue(val, label);
+        });
+    });
 }
 
 function _getValueAtPath(root, path) {
@@ -2056,7 +2076,7 @@ function renderTreeNode(value, path, key, paneId = 'pane1') {
         let html = `<div class="tree-item tree-expandable">
             <span class="tree-toggle" data-tree-path="${escapeHtml(fullPath)}">${toggleIcon}</span>
             <span class="tree-key">${escapeHtml(String(key))}:</span>
-            <span class="tree-bracket">[</span><span class="tree-count">${value.length} items</span><span class="tree-bracket">]</span>`;
+            <span class="tree-bracket">[</span><span class="tree-count tree-array-link" data-tree-path="${escapeHtml(fullPath)}">${value.length} items</span><span class="tree-bracket">]</span>`;
 
         html += '</div>';
 
@@ -2105,19 +2125,31 @@ function toggleTreeNode(path, paneId = 'pane1') {
 // Nested Data Modal
 // =========================================================================
 
+let _nestedModalStack = [];
+
+function openNestedModalValue(value, title) {
+    _nestedModalStack = [{ value, title }];
+    _renderNestedModalFrame();
+    document.getElementById('nested-modal')?.classList.add('open');
+}
+
 function openNestedModal(rowIdx, colKey, paneId = 'pane1') {
     const ps = getPaneState(paneId);
     if (!ps.datasheetData) return;
     const row = ps.datasheetData[rowIdx];
     if (!row || !(colKey in row)) return;
+    openNestedModalValue(row[colKey], `${colKey} [Row ${rowIdx + 1}]`);
+}
 
-    const value = row[colKey];
-    const modal = document.getElementById('nested-modal');
+function _renderNestedModalFrame() {
+    const { value, title } = _nestedModalStack[_nestedModalStack.length - 1];
     const body = document.getElementById('nested-body');
-    const title = document.getElementById('nested-title');
+    const titleEl = document.getElementById('nested-title');
+    const backBtn = document.getElementById('nested-modal-back');
 
-    if (!modal || !body) return;
-    if (title) title.textContent = `${colKey} [Row ${rowIdx + 1}]`;
+    if (!body) return;
+    if (titleEl) titleEl.textContent = title;
+    if (backBtn) backBtn.style.display = _nestedModalStack.length > 1 ? '' : 'none';
 
     if (Array.isArray(value) && value.length > 0) {
         const detect = detectDatasheetMode(JSON.stringify(value));
@@ -2139,13 +2171,12 @@ function openNestedModal(rowIdx, colKey, paneId = 'pane1') {
     } else {
         body.innerHTML = `<pre class="s3-nested-json">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
     }
-
-    modal.classList.add('open');
 }
 
 function closeNestedModal() {
     const modal = document.getElementById('nested-modal');
     if (modal) modal.classList.remove('open');
+    _nestedModalStack = [];
 }
 
 // =========================================================================
@@ -2381,10 +2412,28 @@ document.addEventListener('DOMContentLoaded', () => {
     autoCollapseMQ.addEventListener('change', handleAutoCollapse);
     handleAutoCollapse(autoCollapseMQ);
 
-    // Nested modal close
+    // Nested modal close / back / drill-down (event delegation on body)
     document.getElementById('nested-modal-close')?.addEventListener('click', closeNestedModal);
+    document.getElementById('nested-modal-back')?.addEventListener('click', () => {
+        if (_nestedModalStack.length > 1) {
+            _nestedModalStack.pop();
+            _renderNestedModalFrame();
+        }
+    });
     document.getElementById('nested-modal')?.addEventListener('click', (e) => {
         if (e.target === e.currentTarget) closeNestedModal();
+    });
+    document.getElementById('nested-body')?.addEventListener('click', (e) => {
+        const badge = e.target.closest('.s3-ds-nested');
+        if (!badge || !_nestedModalStack.length) return;
+        const { value } = _nestedModalStack[_nestedModalStack.length - 1];
+        if (!Array.isArray(value)) return;
+        const rIdx = parseInt(badge.dataset.rowIdx, 10);
+        const cKey = badge.dataset.colKey;
+        if (value[rIdx] === null || value[rIdx] === undefined) return;
+        const innerVal = value[rIdx][cKey];
+        _nestedModalStack.push({ value: innerVal, title: `${cKey} [Row ${rIdx + 1}]` });
+        _renderNestedModalFrame();
     });
 
     // Initial empty state — hide sidebar until a folder is opened

@@ -1091,6 +1091,8 @@ main {
 .tree-key { color: var(--tok-string); margin-right: 0.25rem; }
 .tree-bracket { color: var(--tok-operator); margin: 0 0.25rem; }
 .tree-count { color: var(--color-text-tertiary); font-style: italic; font-size: 0.55rem; }
+.tree-count.tree-array-link { color: var(--color-accent-blue); cursor: pointer; }
+.tree-count.tree-array-link:hover { text-decoration: underline; }
 
 .tree-children {
     margin-left: 1.5rem;
