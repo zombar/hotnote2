@@ -1216,6 +1216,10 @@ main {
         display: none;
     }
 
+    .hide-mobile {
+        display: none;
+    }
+
 }
 
 /* Shared banner styles */
@@ -1357,3 +1361,35 @@ html[data-theme="light"] #update-banner {
     padding: 0;
 }
 .cl-body li { margin: 0.15rem 0; }
+
+/* =========================================================================
+   Toast Notifications
+   ========================================================================= */
+#toast-container {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+.toast {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 7px 12px;
+    border-radius: var(--btn-border-radius);
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}

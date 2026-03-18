@@ -74,6 +74,7 @@ const state = {
     currentRelativePath: null,
     currentLine: 1,
     currentChar: 1,
+    lastModifiedTime: null,
     // Split pane state
     splitMode: false,
     _panesHaveSameFile: false,
@@ -100,6 +101,7 @@ const state = {
         currentRelativePath: null,
         currentLine: 1,
         currentChar: 1,
+        lastModifiedTime: null,
     },
 };
 
@@ -794,6 +796,7 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
         try {
             const file = await fileHandle.getFile();
             ps.imageObjectUrl = URL.createObjectURL(file);
+            ps.lastModifiedTime = file.lastModified;
         } catch (err) {
             alert(`Failed to read image: ${err.message}`);
             return;
@@ -801,6 +804,8 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
     } else {
         try {
             content = await readFile(fileHandle);
+            const _fObj = await fileHandle.getFile();
+            ps.lastModifiedTime = _fObj.lastModified;
         } catch (err) {
             alert(`Failed to read file: ${err.message}`);
             return;
@@ -2249,6 +2254,52 @@ function initUpdateChecker() {
 }
 
 // =========================================================================
+// Toast Notifications
+// =========================================================================
+
+function showToast(message, duration = 3000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = message;
+    container.appendChild(el);
+    requestAnimationFrame(() => { el.classList.add('show'); });
+    setTimeout(() => {
+        el.classList.remove('show');
+        el.addEventListener('transitionend', () => el.remove(), { once: true });
+    }, duration);
+}
+
+// =========================================================================
+// File Watcher
+// =========================================================================
+
+function startFileWatcher() {
+    setInterval(async () => {
+        for (const paneId of ['pane1', 'pane2']) {
+            const ps = getPaneState(paneId);
+            if (!ps.currentFileHandle || ps.isDirty) continue;
+            if (paneId === 'pane2' && !state.splitMode) continue;
+            try {
+                const file = await ps.currentFileHandle.getFile();
+                if (ps.lastModifiedTime !== null && file.lastModified !== ps.lastModifiedTime) {
+                    ps.lastModifiedTime = file.lastModified;
+                    const content = await file.text();
+                    const textarea = getPaneEl('source-editor', paneId);
+                    if (textarea) textarea.value = content;
+                    switchToMode(ps.editorMode, paneId, content);
+                    showToast(`Reloaded: ${ps.currentFilename}`);
+                    if (state._panesHaveSameFile) break;
+                }
+            } catch (_) {
+                // file deleted or permissions revoked — ignore silently
+            }
+        }
+    }, 3000);
+}
+
+// =========================================================================
 // Init
 // =========================================================================
 
@@ -2515,4 +2566,6 @@ document.addEventListener('DOMContentLoaded', () => {
         warning.textContent = 'File System Access API not supported. Use Chrome or Edge.';
         document.body.appendChild(warning);
     }
+
+    startFileWatcher();
 });
