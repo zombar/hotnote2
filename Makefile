@@ -1,6 +1,6 @@
 PORT ?= 8080
 
-.PHONY: setup preview lint dupes changelog
+.PHONY: setup preview lint dupes changelog test test-ui test-install test-report
 
 setup:
 	npm install
@@ -20,3 +20,16 @@ preview:
 
 changelog:
 	@bash scripts/gen-changelog.sh
+
+test-install:
+	npm install --save-dev @playwright/test
+	node_modules/.bin/playwright install chromium
+
+test:
+	node_modules/.bin/playwright test
+
+test-ui:
+	node_modules/.bin/playwright test --ui
+
+test-report:
+	node_modules/.bin/playwright show-report
