@@ -461,10 +461,23 @@ function initResizeHandle() {
         document.body.style.cursor = 'col-resize';
     });
 
+    // Compute the minimum drag width from actual rendered button sizes (font-size agnostic)
+    function _toolbarMinWidth() {
+        const toolbar = document.getElementById('sidebar-toolbar');
+        if (!toolbar) return 240;
+        const buttons = toolbar.querySelectorAll('.btn-icon');
+        if (!buttons.length) return 240;
+        const btnWidth = buttons[0].getBoundingClientRect().width;
+        const style = getComputedStyle(toolbar);
+        const gap = parseFloat(style.gap) || parseFloat(style.columnGap) || 4;
+        const pl = parseFloat(style.paddingLeft) || 10;
+        const pr = parseFloat(style.paddingRight) || 10;
+        return Math.ceil(buttons.length * btnWidth + (buttons.length - 1) * gap + pl + pr) + 1; // +1 for sidebar border
+    }
+
     document.addEventListener('mousemove', (e) => {
         if (!handle.classList.contains('dragging')) return;
-        const minWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 288;
-        const newWidth = Math.max(minWidth, Math.min(720, startWidth + (e.clientX - startX)));
+        const newWidth = Math.max(_toolbarMinWidth(), Math.min(720, startWidth + (e.clientX - startX)));
         sidebar.style.width = `${newWidth}px`;
     });
 
@@ -475,4 +488,102 @@ function initResizeHandle() {
             document.body.style.cursor = '';
         }
     });
+}
+
+// =========================================================================
+// Search
+// =========================================================================
+
+function toggleSearch() {
+    if (state.searchActive) {
+        clearSearch();
+    } else {
+        state.searchActive = true;
+        document.getElementById('search-panel').classList.remove('hidden');
+        document.getElementById('search-btn').classList.add('active');
+        document.getElementById('search-input').focus();
+    }
+}
+
+function clearSearch() {
+    state.searchActive = false;
+    state.searchQuery = '';
+    document.getElementById('search-panel').classList.add('hidden');
+    document.getElementById('search-btn').classList.remove('active');
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-content-toggle').checked = false;
+    document.getElementById('search-exclude').value = '';
+    renderSidebar();
+}
+
+async function performSearch(query, includeContent, excludePatterns) {
+    state.searchQuery = query;
+    if (!state.rootHandle || !query.trim()) {
+        renderSidebar();
+        return;
+    }
+    const list = document.getElementById('file-list');
+    list.innerHTML = '<li class="search-status">Searching…</li>';
+
+    const allFiles = await getAllFiles(state.rootHandle, '');
+
+    const nameMatches = allFiles.filter(f =>
+        f.name.toLowerCase().includes(query.toLowerCase()) &&
+        !isUnopenable(f) &&
+        !shouldExclude(f.relPath, f.name, excludePatterns)
+    );
+
+    let results = nameMatches;
+
+    if (includeContent) {
+        const contentHits = new Set();
+        await Promise.all(allFiles.map(async (f) => {
+            if (isUnopenable(f) || f.size > MAX_OPENABLE_SIZE) return;
+            if (shouldExclude(f.relPath, f.name, excludePatterns)) return;
+            try {
+                const text = await (await f.handle.getFile()).text();
+                if (text.toLowerCase().includes(query.toLowerCase())) {
+                    contentHits.add(f.relPath);
+                }
+            } catch (_e) { /* ignore unreadable files */ }
+        }));
+        const nameHitPaths = new Set(nameMatches.map(r => r.relPath));
+        const contentOnly = allFiles.filter(f =>
+            contentHits.has(f.relPath) && !nameHitPaths.has(f.relPath) && !isUnopenable(f)
+        );
+        results = [...nameMatches, ...contentOnly];
+        results.sort((a, b) => a.relPath.localeCompare(b.relPath));
+    }
+
+    renderSearchResults(results);
+}
+
+function renderSearchResults(results) {
+    const list = document.getElementById('file-list');
+    list.innerHTML = '';
+    if (!results.length) {
+        list.innerHTML = '<li class="search-status">No results</li>';
+        return;
+    }
+    for (const result of results) {
+        const li = document.createElement('li');
+        li.className = 'file-entry search-result';
+        const icon = getFileIconSvg(result.name, 'file');
+        const dirPath = result.relPath.includes('/')
+            ? result.relPath.substring(0, result.relPath.lastIndexOf('/'))
+            : '';
+        li.innerHTML = `<div class="file-entry-row">
+            <div class="result-name-row">
+                <span class="icon">${icon}</span>
+                <span class="name">${escapeHtml(result.name)}</span>
+            </div>
+            ${dirPath ? `<div class="result-path">${escapeHtml(dirPath)}</div>` : ''}
+        </div>`;
+        li.addEventListener('click', async () => {
+            state.currentRelativePath = result.relPath;
+            await openFile(result.handle, result.name, true, state.activePaneId);
+        });
+        if (result.relPath === state.currentRelativePath) li.classList.add('active');
+        list.appendChild(li);
+    }
 }

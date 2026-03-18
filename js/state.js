@@ -76,6 +76,9 @@ const state = {
     currentLine: 1,
     currentChar: 1,
     lastModifiedTime: null,
+    // Search state
+    searchActive: false,
+    searchQuery: '',
     // Split pane state
     splitMode: false,
     _panesHaveSameFile: false,

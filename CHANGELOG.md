@@ -1,3 +1,15 @@
+## [0.8.2] — 2026-03-18
+
+### Fixed
+- **Sidebar minimum width** now derived from actual rendered toolbar button sizes rather than a hardcoded pixel value; CSS uses `calc(14.5rem + 1px)` so it scales with browser font-size, and the JS drag-resize minimum measures live button geometry via `getBoundingClientRect` — correct at any zoom or font-size setting
+- **Toolbar icon buttons** (`flex-shrink: 0`) can no longer be compressed by their flex container
+
+## [0.8.0] — 2026-03-18
+
+### Added
+- **Sidebar search**: magnifying-glass icon in sidebar toolbar opens a search panel; type to filter by filename; check "Search content" to also match file contents; click a result to open the file; click the icon again to dismiss and restore the file tree
+- **E2E tests**: 8 new search tests (suite grows to 111)
+
 ## [0.7.9] — 2026-03-18
 
 ### Changed
