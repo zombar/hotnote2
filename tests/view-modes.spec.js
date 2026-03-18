@@ -382,6 +382,22 @@ test.describe('treeview → nested table navigation', () => {
         expect(cells.some(c => c.includes('Alice'))).toBeTruthy();
         expect(cells.some(c => c.includes('Lead'))).toBeTruthy();
     });
+
+    test('nested table has pagination controls', async ({ page }) => {
+        // Build a dept with enough members to need pagination
+        const BIG_DEPT = JSON.stringify({
+            name: 'Engineering',
+            members: Array.from({ length: 60 }, (_, i) => ({ id: i + 1, name: `Person ${i + 1}`, level: (i % 5) + 1 })),
+        });
+        await openMockFolder(page, { 'big.json': BIG_DEPT });
+        await openFile(page, 'big.json');
+        await page.locator('#s3-treeview .tree-array-link').first().click();
+        await expect(page.locator('#nested-modal')).toBeVisible();
+        await expect(page.locator('#s3-ds-prev-modal')).toBeDisabled();
+        await expect(page.locator('#s3-ds-next-modal')).toBeEnabled();
+        await page.locator('#s3-ds-next-modal').click();
+        await expect(page.locator('#s3-ds-prev-modal')).toBeEnabled();
+    });
 });
 
 // ── Datasheet aggregations ────────────────────────────────────────────────────
