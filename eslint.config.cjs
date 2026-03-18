@@ -17,7 +17,13 @@ module.exports = [
             'no-var': 'error',
             'prefer-const': 'error',
             'eqeqeq': ['error', 'always'],
-            'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+            // Cross-file globals are documented by script load order in index.html.
+            // Turning off no-undef avoids requiring per-file /* global */ declarations
+            // for every inter-file function reference in this no-build browser app.
+            'no-undef': 'off',
+            // vars:'local' skips top-level declarations so functions exported to other
+            // script files aren't flagged as unused within their defining file.
+            'no-unused-vars': ['error', { vars: 'local', argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
         },
     },
     {

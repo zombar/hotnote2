@@ -1,0 +1,112 @@
+'use strict';
+
+// =========================================================================
+// Autosave
+// =========================================================================
+
+function loadAutosavePref() {
+    const saved = localStorage.getItem('hotnote2-autosave');
+    return saved !== null ? saved === 'true' : true; // default enabled
+}
+
+function saveAutosavePref(enabled) {
+    localStorage.setItem('hotnote2-autosave', String(enabled));
+}
+
+function startAutosaveTimer(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    if (ps.autosaveTimer) clearTimeout(ps.autosaveTimer);
+    ps.autosaveTimer = setTimeout(() => {
+        ps.autosaveTimer = null;
+        if (ps.isDirty && ps.currentFileHandle && ps.autosaveEnabled) {
+            saveFile(true, paneId);
+        }
+    }, 2000);
+}
+
+function animateAutosaveLabel() {
+    const label = document.getElementById('autosave-label');
+    if (!label) return;
+    label.textContent = 'saved';
+    label.classList.remove('fade-out', 'hidden');
+    setTimeout(() => {
+        label.classList.add('fade-out');
+        setTimeout(() => {
+            label.textContent = 'autosave';
+            label.classList.remove('fade-out');
+        }, 500);
+    }, 1500);
+}
+
+function updateSourceHighlight(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    const codeEl = getPaneEl('source-highlight-code', paneId);
+    if (!codeEl) return;
+    const textarea = getPaneEl('source-editor', paneId);
+    if (!textarea) return;
+    const content = textarea.value;
+    const lang = getExtension(ps.currentFilename);
+
+    // Trailing newline prevents last-line clipping
+    codeEl.innerHTML = highlightCode(content + '\n', lang);
+
+    // Update line numbers
+    const lineNumEl = getPaneEl('line-numbers', paneId);
+    if (lineNumEl) {
+        const lineCount = (content.match(/\n/g) || []).length + 1;
+        lineNumEl.textContent = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
+    }
+}
+
+function _scrollElForMode(mode, paneId = 'pane1') {
+    if (mode === 'source') return getPaneEl('source-editor', paneId);
+    if (mode === 'wysiwyg') return getPaneEl('wysiwyg', paneId);
+    if (mode === 'treeview') return getPaneEl('s3-treeview', paneId);
+    if (mode === 'datasheet') return getPaneEl('s3-datasheet', paneId);
+    if (mode === 'image') return getPaneEl('image-viewer', paneId);
+    return null;
+}
+
+
+// =========================================================================
+// Save
+// =========================================================================
+
+async function saveFile(silent = false, paneId = null) {
+    const pid = paneId || state.activePaneId;
+    const ps = getPaneState(pid);
+    if (!ps.currentFileHandle) return;
+    const textarea = getPaneEl('source-editor', pid);
+    try {
+        await writeFile(ps.currentFileHandle, textarea ? textarea.value : '');
+        ps.isDirty = false;
+        if (pid === 'pane1') {
+            updateTitle();
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) { saveBtn.classList.remove('dirty'); saveBtn.disabled = true; }
+        }
+        if (silent) animateAutosaveLabel();
+    } catch (err) {
+        if (!silent) alert(`Failed to save: ${err.message}`);
+        else console.error('Autosave failed:', err);
+    }
+}
+
+function setDirty(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    if (!ps.isDirty) {
+        ps.isDirty = true;
+        if (paneId === 'pane1') {
+            updateTitle();
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) { saveBtn.classList.add('dirty'); saveBtn.disabled = false; }
+        }
+    }
+    startAutosaveTimer(paneId);
+}
+
+function updateTitle() {
+    const prefix = state.isDirty ? '• ' : '';
+    const filename = state.currentFilename ? ` — ${state.currentFilename}` : '';
+    document.title = `${prefix}hotnote${filename}`;
+}

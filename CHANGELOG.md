@@ -1,3 +1,8 @@
+## [0.7.9] — 2026-03-18
+
+### Changed
+- **Refactor: split `js/hotnote.js` into 11 focused modules** — `state.js`, `utils.js`, `url-state.js`, `highlight.js`, `json-views.js`, `autosave.js`, `split-pane.js`, `ui.js`, `editor.js`, `sidebar.js`, `init.js`; loaded in order via `<script>` tags; no build step, no behaviour changes
+
 ## [0.7.8] — 2026-03-18
 
 ### Changed
