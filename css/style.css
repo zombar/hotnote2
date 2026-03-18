@@ -21,7 +21,7 @@ html[data-theme="dark"] {
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
     --panel-border-radius: 0;
     --header-height: 58px;
-    --sidebar-width: 232px;
+    --sidebar-width: calc(14.5rem + 1px); /* 6×2rem buttons + 5×0.25rem gaps + 2×0.625rem padding + 1px border */
     --resize-handle-width: 3px;
     /* Syntax token colors — vivid but not garish */
     --tok-keyword: #d070b8;    /* magenta-rose */
@@ -60,7 +60,7 @@ html[data-theme="light"] {
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
     --panel-border-radius: 0;
     --header-height: 58px;
-    --sidebar-width: 232px;
+    --sidebar-width: calc(14.5rem + 1px); /* 6×2rem buttons + 5×0.25rem gaps + 2×0.625rem padding + 1px border */
     --resize-handle-width: 3px;
     /* Syntax token colors — clear and readable on light backgrounds */
     --tok-keyword: #8b0a5a;    /* deep crimson-magenta */
@@ -884,6 +884,7 @@ main {
 /* Icon-only button — fixed square */
 .btn-icon {
     width: 2rem;
+    flex-shrink: 0;
     padding: 0;
     line-height: 0;
 }

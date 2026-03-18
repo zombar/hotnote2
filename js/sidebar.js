@@ -461,10 +461,23 @@ function initResizeHandle() {
         document.body.style.cursor = 'col-resize';
     });
 
+    // Compute the minimum drag width from actual rendered button sizes (font-size agnostic)
+    function _toolbarMinWidth() {
+        const toolbar = document.getElementById('sidebar-toolbar');
+        if (!toolbar) return 240;
+        const buttons = toolbar.querySelectorAll('.btn-icon');
+        if (!buttons.length) return 240;
+        const btnWidth = buttons[0].getBoundingClientRect().width;
+        const style = getComputedStyle(toolbar);
+        const gap = parseFloat(style.gap) || parseFloat(style.columnGap) || 4;
+        const pl = parseFloat(style.paddingLeft) || 10;
+        const pr = parseFloat(style.paddingRight) || 10;
+        return Math.ceil(buttons.length * btnWidth + (buttons.length - 1) * gap + pl + pr) + 1; // +1 for sidebar border
+    }
+
     document.addEventListener('mousemove', (e) => {
         if (!handle.classList.contains('dragging')) return;
-        const minWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 232;
-        const newWidth = Math.max(minWidth, Math.min(720, startWidth + (e.clientX - startX)));
+        const newWidth = Math.max(_toolbarMinWidth(), Math.min(720, startWidth + (e.clientX - startX)));
         sidebar.style.width = `${newWidth}px`;
     });
 

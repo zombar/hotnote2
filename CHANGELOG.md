@@ -1,3 +1,9 @@
+## [0.8.2] — 2026-03-18
+
+### Fixed
+- **Sidebar minimum width** now derived from actual rendered toolbar button sizes rather than a hardcoded pixel value; CSS uses `calc(14.5rem + 1px)` so it scales with browser font-size, and the JS drag-resize minimum measures live button geometry via `getBoundingClientRect` — correct at any zoom or font-size setting
+- **Toolbar icon buttons** (`flex-shrink: 0`) can no longer be compressed by their flex container
+
 ## [0.8.0] — 2026-03-18
 
 ### Added
