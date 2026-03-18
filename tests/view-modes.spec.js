@@ -262,6 +262,62 @@ test.describe('treeview interactivity', () => {
     });
 });
 
+// ── Datasheet nested array / object drill-down ────────────────────────────────
+
+const NESTED_ARRAY_DATA = JSON.stringify([
+    { id: 1, name: 'Alice', tags: ['admin', 'editor'], address: { city: 'NYC', zip: '10001' } },
+    { id: 2, name: 'Bob',   tags: ['viewer'],           address: { city: 'LA',  zip: '90001' } },
+    { id: 3, name: 'Carol', tags: ['admin', 'viewer', 'editor'], address: { city: 'Chicago', zip: '60601' } },
+]);
+
+test.describe('datasheet nested array drill-down', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('nested object array auto-opens in table view', async ({ page }) => {
+        await openMockFolder(page, { 'people.json': NESTED_ARRAY_DATA });
+        await openFile(page, 'people.json');
+        // Should default to datasheet (table) mode, not treeview
+        await expect(page.locator('#s3-datasheet')).toBeVisible();
+        await expect(page.locator('#s3-treeview')).toBeHidden();
+    });
+
+    test('nested array cells show item count badge', async ({ page }) => {
+        await openMockFolder(page, { 'people.json': NESTED_ARRAY_DATA });
+        await openFile(page, 'people.json');
+        // All "tags" cells should render as "N items"
+        const nestedCells = page.locator('#s3-datasheet .s3-ds-nested-text');
+        const texts = await nestedCells.allTextContents();
+        expect(texts.some(t => t.includes('items'))).toBeTruthy();
+    });
+
+    test('nested object cells show {…} badge', async ({ page }) => {
+        await openMockFolder(page, { 'people.json': NESTED_ARRAY_DATA });
+        await openFile(page, 'people.json');
+        const nestedCells = page.locator('#s3-datasheet .s3-ds-nested-text');
+        const texts = await nestedCells.allTextContents();
+        expect(texts.some(t => t.includes('{…}'))).toBeTruthy();
+    });
+
+    test('clicking nested array cell opens drill-down modal', async ({ page }) => {
+        await openMockFolder(page, { 'people.json': NESTED_ARRAY_DATA });
+        await openFile(page, 'people.json');
+        await page.locator('#s3-datasheet .s3-ds-nested').first().click();
+        await expect(page.locator('#nested-modal')).toBeVisible();
+    });
+
+    test('drill-down modal close button hides modal', async ({ page }) => {
+        await openMockFolder(page, { 'people.json': NESTED_ARRAY_DATA });
+        await openFile(page, 'people.json');
+        await page.locator('#s3-datasheet .s3-ds-nested').first().click();
+        await expect(page.locator('#nested-modal')).toBeVisible();
+        await page.locator('#nested-modal-close').click();
+        await expect(page.locator('#nested-modal')).toBeHidden();
+    });
+});
+
 // ── Datasheet aggregations ────────────────────────────────────────────────────
 
 test.describe('datasheet aggregations', () => {
