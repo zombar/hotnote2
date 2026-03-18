@@ -70,6 +70,16 @@ test.describe('split pane content', () => {
         await expect(wysiwyg2.locator('h1')).toContainText('Hello World');
     });
 
+    test('editing source in pane1 syncs to pane2 wysiwyg preview', async ({ page }) => {
+        await openMockFolder(page, { 'notes.md': '# Hello' });
+        await clickFile(page, 'notes.md');
+        await page.locator('#split-pane-btn').click();
+        await expect(page.locator('#wysiwyg-p2 h1')).toContainText('Hello');
+        // Edit pane1 source; debouncedSyncPreview re-renders pane2 wysiwyg after 300ms
+        await page.locator('#source-editor').fill('# Updated');
+        await expect(page.locator('#wysiwyg-p2 h1')).toContainText('Updated', { timeout: 2000 });
+    });
+
     test('pane2 editor can open a different file independently', async ({ page }) => {
         await openMockFolder(page, { 'a.md': '# File A', 'b.md': '# File B' });
         await clickFile(page, 'a.md');

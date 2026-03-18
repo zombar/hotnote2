@@ -69,6 +69,27 @@ test.describe('session restore', () => {
     });
 });
 
+// ── URL state ─────────────────────────────────────────────────────────────────
+
+test.describe('URL state', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('URL includes workdir after opening a folder', async ({ page }) => {
+        await openMockFolder(page, { 'f.md': '# F' });
+        expect(page.url()).toContain('workdir=my-notes');
+    });
+
+    test('URL includes file param after opening a file', async ({ page }) => {
+        await openMockFolder(page, { 'notes.md': '# N' });
+        await page.locator('#file-list li.file-entry .file-entry-row').first().click();
+        await expect(page.locator('#source-editor')).not.toHaveValue('');
+        expect(page.url()).toContain('file=notes.md');
+    });
+});
+
 // ── Sidebar toggle ───────────────────────────────────────────────────────────
 
 test.describe('sidebar toggle', () => {

@@ -171,6 +171,141 @@ test.describe('treeview mode', () => {
     });
 });
 
+// ── Mode toolbar active state ─────────────────────────────────────────────────
+
+test.describe('mode toolbar active state', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('source mode button has active class by default', async ({ page }) => {
+        await openMockFolder(page, { 'notes.md': SAMPLE_MD });
+        await openFile(page, 'notes.md');
+        await expect(page.locator('#mode-source')).toHaveClass(/active/);
+    });
+
+    test('active class moves to wysiwyg button when switching modes', async ({ page }) => {
+        await openMockFolder(page, { 'notes.md': SAMPLE_MD });
+        await openFile(page, 'notes.md');
+        await page.locator('#mode-wysiwyg').click();
+        await expect(page.locator('#mode-wysiwyg')).toHaveClass(/active/);
+        await expect(page.locator('#mode-source')).not.toHaveClass(/active/);
+    });
+});
+
+// ── Wysiwyg link opens new tab ─────────────────────────────────────────────────
+
+test.describe('wysiwyg link new tab', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('clicking a link in wysiwyg opens a new tab', async ({ page }) => {
+        const LINKED_MD = '# Title\n\n[Visit Example](https://example.com)\n';
+        await openMockFolder(page, { 'linked.md': LINKED_MD });
+        await openFile(page, 'linked.md');
+        await page.locator('#mode-wysiwyg').click();
+        await expect(page.locator('#wysiwyg a')).toBeVisible();
+        const [newPage] = await Promise.all([
+            page.context().waitForEvent('page'),
+            page.locator('#wysiwyg a').click(),
+        ]);
+        await newPage.waitForLoadState('domcontentloaded');
+        expect(newPage.url()).toContain('example.com');
+        await newPage.close();
+    });
+});
+
+// ── Treeview interactivity ────────────────────────────────────────────────────
+
+test.describe('treeview interactivity', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('clicking tree-toggle collapses a node', async ({ page }) => {
+        const JSON_NESTED = JSON.stringify({ nested: { a: 1, b: 2 }, other: 'val' });
+        await openMockFolder(page, { 'data.json': JSON_NESTED });
+        await openFile(page, 'data.json');
+        await page.locator('#mode-treeview').click();
+        await expect(page.locator('#s3-treeview')).toBeVisible();
+        // Initially expanded — children should be visible
+        await expect(page.locator('#s3-treeview .tree-children').first()).toBeVisible();
+        // Click the first toggle (root node) to collapse everything
+        await page.locator('#s3-treeview .tree-toggle').first().click();
+        // After collapse, no children divs remain
+        await expect(page.locator('#s3-treeview .tree-children')).toHaveCount(0);
+    });
+
+    test('clicking tree-array-link opens nested modal', async ({ page }) => {
+        const JSON_WITH_ARRAY = JSON.stringify({ items: [1, 2, 3], name: 'test' });
+        await openMockFolder(page, { 'data.json': JSON_WITH_ARRAY });
+        await openFile(page, 'data.json');
+        await page.locator('#mode-treeview').click();
+        await expect(page.locator('#s3-treeview .tree-array-link')).toBeVisible();
+        await page.locator('#s3-treeview .tree-array-link').click();
+        await expect(page.locator('#nested-modal')).toBeVisible();
+    });
+
+    test('nested modal close button hides the modal', async ({ page }) => {
+        const JSON_WITH_ARRAY = JSON.stringify({ items: [1, 2, 3], name: 'test' });
+        await openMockFolder(page, { 'data.json': JSON_WITH_ARRAY });
+        await openFile(page, 'data.json');
+        await page.locator('#mode-treeview').click();
+        await page.locator('#s3-treeview .tree-array-link').click();
+        await expect(page.locator('#nested-modal')).toBeVisible();
+        await page.locator('#nested-modal-close').click();
+        await expect(page.locator('#nested-modal')).toBeHidden();
+    });
+});
+
+// ── Datasheet aggregations ────────────────────────────────────────────────────
+
+test.describe('datasheet aggregations', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('aggregation footer shows sum and avg for numeric columns', async ({ page }) => {
+        const DATA = JSON.stringify([
+            { name: 'A', score: 90 },
+            { name: 'B', score: 80 },
+        ]);
+        await openMockFolder(page, { 'scores.json': DATA });
+        await openFile(page, 'scores.json');
+        await page.locator('#mode-datasheet').click();
+        await expect(page.locator('#s3-ds-tfoot')).toBeVisible();
+        await expect(page.locator('#s3-ds-tfoot')).toContainText('170');
+        await expect(page.locator('#s3-ds-tfoot')).toContainText('85');
+    });
+});
+
+// ── Datasheet pagination ──────────────────────────────────────────────────────
+
+test.describe('datasheet pagination', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('prev is disabled on first page and next navigates to page 2', async ({ page }) => {
+        const BIG_JSON = JSON.stringify(
+            Array.from({ length: 60 }, (_, i) => ({ id: i + 1, val: `item${i}` }))
+        );
+        await openMockFolder(page, { 'big.json': BIG_JSON });
+        await openFile(page, 'big.json');
+        await page.locator('#mode-datasheet').click();
+        await expect(page.locator('#s3-ds-prev')).toBeDisabled();
+        await expect(page.locator('#s3-ds-next')).toBeEnabled();
+        await page.locator('#s3-ds-next').click();
+        await expect(page.locator('#s3-ds-prev')).toBeEnabled();
+    });
+});
+
 // ── Syntax highlighting ───────────────────────────────────────────────────────
 
 test.describe('syntax highlighting', () => {

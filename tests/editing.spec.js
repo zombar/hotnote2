@@ -119,4 +119,66 @@ test.describe('autosave', () => {
         const written = await page.evaluate(() => window.__mockFS.written);
         expect(written['notes.md']).toContain('# Hello updated');
     });
+
+    test('autosave label shows "saved" briefly after autosave triggers', async ({ page }) => {
+        await page.clock.install();
+        await openMockFolder(page, { 'notes.md': '# Hello' });
+        await openFile(page, 'notes.md');
+
+        // Autosave is enabled by default; ensure checkbox is checked
+        const checked = await page.locator('#autosave-checkbox').isChecked();
+        if (!checked) await page.locator('#autosave-checkbox').click();
+
+        await page.locator('#source-editor').fill('# Hello updated');
+
+        // Advance clock past the 2s autosave debounce
+        await page.clock.fastForward(2500);
+
+        await expect(page.locator('#autosave-label')).toHaveText('saved');
+    });
+});
+
+// ── Discard changes ───────────────────────────────────────────────────────────
+
+test.describe('discard changes', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('accepting discard opens the new file', async ({ page }) => {
+        await openMockFolder(page, { 'a.md': '# A', 'b.md': '# B' });
+        await openFile(page, 'a.md');
+        await page.locator('#source-editor').fill('# A modified');
+        page.once('dialog', d => d.accept());
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'b.md' }).click();
+        await expect(page.locator('#source-editor')).toHaveValue(/# B/, { timeout: 5000 });
+    });
+
+    test('dismissing discard stays on current file with edits', async ({ page }) => {
+        await openMockFolder(page, { 'a.md': '# A', 'b.md': '# B' });
+        await openFile(page, 'a.md');
+        await page.locator('#source-editor').fill('# A modified');
+        page.once('dialog', d => d.dismiss());
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'b.md' }).click();
+        await expect(page.locator('#source-editor')).toHaveValue('# A modified');
+    });
+});
+
+// ── File watcher ──────────────────────────────────────────────────────────────
+
+test.describe('file watcher', () => {
+    test('file watcher shows toast when file changes externally', async ({ page }) => {
+        // Clock must be installed BEFORE goto to intercept setInterval in startFileWatcher
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.clock.install();
+        await page.goto('/');
+        await openMockFolder(page, { 'notes.md': '# Hello' });
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'notes.md' }).click();
+        await expect(page.locator('#source-editor')).not.toHaveValue('');
+        // Advance past the 3s watcher interval; getFile() returns a newer lastModified → toast
+        await page.clock.fastForward(3001);
+        await expect(page.locator('#toast-container .toast')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#toast-container .toast')).toContainText('Reloaded: notes.md');
+    });
 });

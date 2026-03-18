@@ -49,6 +49,24 @@ test.describe('theme persistence across reload', () => {
     });
 });
 
+// ── Line numbers ──────────────────────────────────────────────────────────────
+
+test.describe('line numbers', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('line numbers are populated when a file is open', async ({ page }) => {
+        await openMockFolder(page, { 'multi.md': 'line1\nline2\nline3' });
+        await page.locator('#file-list li.file-entry .file-entry-row').first().click();
+        await expect(page.locator('#source-editor')).not.toHaveValue('');
+        const lineNums = await page.locator('#line-numbers').textContent();
+        expect(lineNums).toContain('1');
+        expect(lineNums).toContain('3');
+    });
+});
+
 // ── Sidebar resize ────────────────────────────────────────────────────────────
 
 test.describe('sidebar resize', () => {
