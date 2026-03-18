@@ -313,7 +313,7 @@ main {
 #search-panel {
     background: var(--color-bg-toolbar);
     border-bottom: 1px solid var(--color-border-primary);
-    padding: 0.375rem 0.625rem 0.25rem;
+    padding: 0.375rem 0.625rem;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
