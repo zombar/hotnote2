@@ -1,3 +1,10 @@
+## [0.7.7] — 2026-03-18
+
+### Added
+- **Example: `examples/team.json`** — array-of-objects that auto-opens in Table view; `tags` (nested array) and `address` (nested object) columns show item-count / `{…}` badges that drill down into a modal
+- **Example: `examples/departments.json`** — top-level JSON object that auto-opens in Tree (preview) mode; `engineering`, `design`, and `data` properties are arrays-of-objects — clicking the `N items` link next to each navigates into a full table in the drill-down modal
+- **E2E tests**: 10 new tests covering nested array/object drill-down from both datasheet and treeview modes (suite grows to 101)
+
 ## [0.7.6] — 2026-03-18
 
 ### Added
