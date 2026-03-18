@@ -1,0 +1,19 @@
+{
+  "company": "Acme Corp",
+  "year": 2026,
+  "engineering": [
+    { "name": "Alice Nguyen",  "role": "Lead",              "level": 5, "active": true  },
+    { "name": "David Kim",     "role": "Frontend Engineer", "level": 3, "active": true  },
+    { "name": "Priya Sharma",  "role": "Backend Engineer",  "level": 4, "active": true  },
+    { "name": "Tom Eriksson",  "role": "DevOps",            "level": 3, "active": false }
+  ],
+  "design": [
+    { "name": "Bob Martínez",  "role": "Lead Designer", "level": 4, "active": true },
+    { "name": "Lena Hoffmann", "role": "UX Researcher",  "level": 3, "active": true }
+  ],
+  "data": [
+    { "name": "Eva Rossi",    "role": "Data Engineer", "level": 5, "active": true },
+    { "name": "James Okafor", "role": "Analyst",       "level": 2, "active": true },
+    { "name": "Nora Petrov",  "role": "ML Engineer",   "level": 4, "active": true }
+  ]
+}
