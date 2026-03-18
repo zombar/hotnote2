@@ -95,6 +95,60 @@ async function getAllFiles(dirHandle, basePath, results = []) {
     return results;
 }
 
+// =========================================================================
+// Glob / Exclusion Matching
+// =========================================================================
+
+function _globToRegex(pattern) {
+    let out = '';
+    let i = 0;
+    while (i < pattern.length) {
+        const ch = pattern[i];
+        if (ch === '*' && pattern[i + 1] === '*') {
+            out += '.*';
+            i += 2;
+            if (pattern[i] === '/') i++; // consume separator after **
+        } else if (ch === '*') {
+            out += '[^/]*';
+            i++;
+        } else if (ch === '?') {
+            out += '[^/]';
+            i++;
+        } else {
+            out += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+            i++;
+        }
+    }
+    return new RegExp('^' + out + '$', 'i');
+}
+
+function _matchesExcludePattern(pattern, relPath, name) {
+    pattern = pattern.trim();
+    if (!pattern) return false;
+    const hasSlash = pattern.includes('/');
+    const hasGlob = pattern.includes('*') || pattern.includes('?');
+    if (!hasSlash && !hasGlob) {
+        // Bare name: match any path segment exactly (catches dirs and files by name)
+        return relPath.split('/').some(seg => seg.toLowerCase() === pattern.toLowerCase());
+    }
+    if (!hasSlash) {
+        // Glob without slash: test against filename only
+        return _globToRegex(pattern).test(name);
+    }
+    // Pattern with slash: test against full relPath
+    if (_globToRegex(pattern).test(relPath)) return true;
+    // Strip leading **/ so "**/*.snap" also matches root-level "foo.snap"
+    if (pattern.startsWith('**/')) {
+        return _globToRegex(pattern.slice(3)).test(relPath);
+    }
+    return false;
+}
+
+function shouldExclude(relPath, name, patterns) {
+    if (!patterns || !patterns.length) return false;
+    return patterns.some(p => _matchesExcludePattern(p, relPath, name));
+}
+
 async function createFile(name, dirHandle) {
     const dh = dirHandle || state.currentDirHandle;
     if (!dh) return null;

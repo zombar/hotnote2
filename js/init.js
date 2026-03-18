@@ -59,18 +59,29 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('split-pane-btn')?.addEventListener('click', toggleSplitPane);
 
     // Search
-    let searchDebounceTimer = null;
-    document.getElementById('search-btn')?.addEventListener('click', toggleSearch);
-    document.getElementById('search-input')?.addEventListener('input', (e) => {
-        clearTimeout(searchDebounceTimer);
-        const includeContent = document.getElementById('search-content-toggle')?.checked ?? false;
-        const delay = includeContent ? 500 : 300;
-        searchDebounceTimer = setTimeout(() => performSearch(e.target.value, includeContent), delay);
-    });
-    document.getElementById('search-content-toggle')?.addEventListener('change', () => {
+    function _getSearchParams() {
         const query = document.getElementById('search-input')?.value ?? '';
         const includeContent = document.getElementById('search-content-toggle')?.checked ?? false;
-        performSearch(query, includeContent);
+        const excludeRaw = document.getElementById('search-exclude')?.value ?? '';
+        const excludePatterns = excludeRaw.split(',').map(s => s.trim()).filter(Boolean);
+        return { query, includeContent, excludePatterns };
+    }
+    let searchDebounceTimer = null;
+    document.getElementById('search-btn')?.addEventListener('click', toggleSearch);
+    document.getElementById('search-input')?.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        const { query, includeContent, excludePatterns } = _getSearchParams();
+        const delay = includeContent ? 500 : 300;
+        searchDebounceTimer = setTimeout(() => performSearch(query, includeContent, excludePatterns), delay);
+    });
+    document.getElementById('search-content-toggle')?.addEventListener('change', () => {
+        const { query, includeContent, excludePatterns } = _getSearchParams();
+        performSearch(query, includeContent, excludePatterns);
+    });
+    document.getElementById('search-exclude')?.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        const { query, includeContent, excludePatterns } = _getSearchParams();
+        searchDebounceTimer = setTimeout(() => performSearch(query, includeContent, excludePatterns), 400);
     });
 
     // Pane focus tracking

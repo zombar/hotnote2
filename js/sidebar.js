@@ -499,10 +499,11 @@ function clearSearch() {
     document.getElementById('search-btn').classList.remove('active');
     document.getElementById('search-input').value = '';
     document.getElementById('search-content-toggle').checked = false;
+    document.getElementById('search-exclude').value = '';
     renderSidebar();
 }
 
-async function performSearch(query, includeContent) {
+async function performSearch(query, includeContent, excludePatterns) {
     state.searchQuery = query;
     if (!state.rootHandle || !query.trim()) {
         renderSidebar();
@@ -515,7 +516,8 @@ async function performSearch(query, includeContent) {
 
     const nameMatches = allFiles.filter(f =>
         f.name.toLowerCase().includes(query.toLowerCase()) &&
-        !isUnopenable(f)
+        !isUnopenable(f) &&
+        !shouldExclude(f.relPath, f.name, excludePatterns)
     );
 
     let results = nameMatches;
@@ -524,6 +526,7 @@ async function performSearch(query, includeContent) {
         const contentHits = new Set();
         await Promise.all(allFiles.map(async (f) => {
             if (isUnopenable(f) || f.size > MAX_OPENABLE_SIZE) return;
+            if (shouldExclude(f.relPath, f.name, excludePatterns)) return;
             try {
                 const text = await (await f.handle.getFile()).text();
                 if (text.toLowerCase().includes(query.toLowerCase())) {
