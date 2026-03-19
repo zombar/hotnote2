@@ -93,3 +93,50 @@ test.describe('split pane content', () => {
         await expect(page.locator('#source-editor')).toHaveValue(/# File A/);
     });
 });
+
+// ── Folder re-open resets state ───────────────────────────────────────────────
+
+test.describe('folder re-open resets state', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('pane2 is hidden after opening a new folder', async ({ page }) => {
+        await openMockFolder(page, { 'a.md': '# A' });
+        await page.locator('#split-pane-btn').click();
+        await expect(page.locator('#pane2')).toBeVisible();
+
+        // Open a second folder
+        await page.evaluate(() => window.__mockFS.setTree({ 'b.md': '# B' }, 'folder-b'));
+        await page.locator('#open-folder').click();
+        await page.locator('#file-list li').first().waitFor({ state: 'visible' });
+
+        await expect(page.locator('#pane2')).toBeHidden();
+    });
+
+    test('split button loses active class after opening a new folder', async ({ page }) => {
+        await openMockFolder(page, { 'a.md': '# A' });
+        await page.locator('#split-pane-btn').click();
+        await expect(page.locator('#split-pane-btn')).toHaveClass(/active/);
+
+        await page.evaluate(() => window.__mockFS.setTree({ 'b.md': '# B' }, 'folder-b'));
+        await page.locator('#open-folder').click();
+        await page.locator('#file-list li').first().waitFor({ state: 'visible' });
+
+        await expect(page.locator('#split-pane-btn')).not.toHaveClass(/active/);
+    });
+
+    test('back button is disabled after opening a new folder', async ({ page }) => {
+        await openMockFolder(page, { 'a.md': '# A', 'b.md': '# B' });
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'a.md' }).click();
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'b.md' }).click();
+        await expect(page.locator('#back-btn')).toBeEnabled();
+
+        await page.evaluate(() => window.__mockFS.setTree({ 'c.md': '# C' }, 'folder-c'));
+        await page.locator('#open-folder').click();
+        await page.locator('#file-list li').first().waitFor({ state: 'visible' });
+
+        await expect(page.locator('#back-btn')).toBeDisabled();
+    });
+});
