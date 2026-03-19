@@ -1,3 +1,9 @@
+## [0.9.1] — 2026-03-19
+
+### Fixed
+- **Folder re-open resets both panes**: opening a new folder now closes split pane, hides pane2, and clears file history for both panes; previously pane2 kept showing content from the previous folder
+- **E2E tests**: 3 new tests covering pane2 hidden, split button inactive, and back button disabled after folder re-open (suite grows to 142)
+
 ## [0.9.0] — 2026-03-19
 
 ### Added
