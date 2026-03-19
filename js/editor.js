@@ -240,6 +240,18 @@ function determineInitialMode(ext, content, paneState) {
     }
 
     ps.editorMode = 'source';
+
+    // Auto-switch to diff when git filter is active and file has uncommitted changes
+    if (state.gitFilterActive && state.gitAvailable && ps.currentRelativePath &&
+            state.gitChangedPaths.has(ps.currentRelativePath)) {
+        ps.editorMode = 'diff';
+    }
+}
+
+function applyWordWrap(paneId) {
+    const ps = getPaneState(paneId);
+    const wrapEl = getPaneEl('source-editor-wrap', paneId);
+    if (wrapEl) wrapEl.classList.toggle('word-wrap-on', ps.wordWrap);
 }
 
 function renderEditor(content, filename, paneId = 'pane1') {
@@ -262,6 +274,7 @@ function renderEditor(content, filename, paneId = 'pane1') {
 
     updateModeToolbar(paneId);
     switchToMode(ps.editorMode, paneId, content);
+    applyWordWrap(paneId);
 }
 
 function updateModeToolbar(paneId = 'pane1') {
@@ -288,18 +301,30 @@ function updateModeToolbar(paneId = 'pane1') {
     }
 
     const sfx = paneId === 'pane2' ? '-p2' : '';
+    const showDiff = state.gitAvailable && !!ps.currentRelativePath;
+
     modeToolbar.innerHTML = `
         <button class="btn btn-sm${ps.editorMode === 'source' ? ' active' : ''}" id="mode-source${sfx}">Source</button>
         ${isMd ? `<button class="btn btn-sm${ps.editorMode === 'wysiwyg' ? ' active' : ''}" id="mode-wysiwyg${sfx}">Preview</button>` : ''}
         ${hasDatasheet ? `<button class="btn btn-sm${ps.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet${sfx}">Table</button>` : ''}
         ${hasTree ? `<button class="btn btn-sm${ps.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview${sfx}">Tree</button>` : ''}
+        ${showDiff ? `<button class="btn btn-sm${ps.editorMode === 'diff' ? ' active' : ''}" id="mode-diff${sfx}">Diff</button>` : ''}
         <span id="filename-display${sfx}" class="filename-display">${escapeHtml(ps.currentFilename)}</span>
+        <label class="wrap-toggle-label" title="Toggle word wrap">
+            <input type="checkbox" id="wrap-toggle${sfx}" class="pill-toggle"${ps.wordWrap ? ' checked' : ''}>
+            <span>wrap</span>
+        </label>
     `;
 
     document.getElementById(`mode-source${sfx}`)?.addEventListener('click', () => switchToMode('source', paneId));
     document.getElementById(`mode-wysiwyg${sfx}`)?.addEventListener('click', () => switchToMode('wysiwyg', paneId));
     document.getElementById(`mode-datasheet${sfx}`)?.addEventListener('click', () => switchToMode('datasheet', paneId));
     document.getElementById(`mode-treeview${sfx}`)?.addEventListener('click', () => switchToMode('treeview', paneId));
+    document.getElementById(`mode-diff${sfx}`)?.addEventListener('click', () => switchToMode('diff', paneId));
+    document.getElementById(`wrap-toggle${sfx}`)?.addEventListener('change', (e) => {
+        ps.wordWrap = e.target.checked;
+        applyWordWrap(paneId);
+    });
 }
 
 async function resolveLocalImages(container) {
@@ -351,6 +376,7 @@ function switchToMode(mode, paneId = 'pane1', content) {
     const datasheet = getPaneEl('s3-datasheet', paneId);
     const treeview = getPaneEl('s3-treeview', paneId);
     const imageViewer = getPaneEl('image-viewer', paneId);
+    const diffView = getPaneEl('diff-view', paneId);
 
     // Hide all panels
     if (wrap) wrap.style.display = 'none';
@@ -358,6 +384,7 @@ function switchToMode(mode, paneId = 'pane1', content) {
     if (datasheet) datasheet.style.display = 'none';
     if (treeview) treeview.style.display = 'none';
     if (imageViewer) imageViewer.style.display = 'none';
+    if (diffView) diffView.style.display = 'none';
 
     const currentContent = content !== undefined ? content : (textarea ? textarea.value : '');
 
@@ -416,6 +443,25 @@ function switchToMode(mode, paneId = 'pane1', content) {
                 imageViewer.innerHTML = ps.imageObjectUrl
                     ? `<img src="${ps.imageObjectUrl}" alt="${escapeHtml(ps.currentFilename)}">`
                     : `<p style="color:var(--color-text-tertiary)">Failed to load image</p>`;
+            }
+            break;
+
+        case 'diff':
+            if (diffView) {
+                diffView.style.display = 'block';
+                diffView.innerHTML = '<div class="diff-loading">Loading diff\u2026</div>';
+                const _relPath = ps.currentRelativePath;
+                const _currentContent = textarea ? textarea.value : '';
+                const _lang = getExtension(ps.currentFilename);
+                readHeadBlob(state.rootHandle, _relPath).then(headContent => {
+                    if (ps.editorMode !== 'diff') return; // mode switched away
+                    const status = headContent === null ? 'untracked' : 'modified';
+                    diffView.innerHTML = renderDiff(headContent ?? '', _currentContent, status, _lang);
+                }).catch(() => {
+                    if (ps.editorMode === 'diff') {
+                        diffView.innerHTML = '<div class="diff-clean">Could not load HEAD content</div>';
+                    }
+                });
             }
             break;
     }

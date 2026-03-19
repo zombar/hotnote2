@@ -25,7 +25,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Open folder button
-    document.getElementById('open-folder')?.addEventListener('click', openFolder);
+    document.getElementById('open-folder')?.addEventListener('click', async () => {
+        await openFolder();
+        await refreshGitStatus();
+    });
+
+    // Git changes filter checkbox
+    document.getElementById('git-filter-checkbox')?.addEventListener('change', (e) => {
+        state.gitFilterActive = e.target.checked;
+        updateGitFilterBar();
+        renderSidebar();
+    });
 
     // Wysiwyg link clicks — open in new tab so we don't navigate away
     document.getElementById('wysiwyg')?.addEventListener('click', (e) => {
@@ -229,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const charNum = parseInt(banner?.dataset.char || '0', 10) || 0;
         dismissResumePrompt();
         await openFolder();
+        await refreshGitStatus();
         if (filePath && state.rootHandle) {
             await openFileByPath(state.rootHandle, filePath, lineNum, charNum);
         }

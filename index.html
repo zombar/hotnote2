@@ -60,7 +60,7 @@
         </div>
         <div class="header-right">
             <label class="autosave-toggle" id="autosave-toggle-label" title="Automatically save changes after 2 seconds of inactivity">
-                <input type="checkbox" id="autosave-checkbox" aria-label="Autosave" />
+                <input type="checkbox" id="autosave-checkbox" class="pill-toggle" aria-label="Autosave" />
                 <span id="autosave-label">autosave</span>
             </label>
             <button class="btn btn-sm btn-icon" id="save-btn" disabled title="Save file (Ctrl+S / Cmd+S)" aria-label="Save file">
@@ -97,6 +97,9 @@
                 <button class="btn btn-sm btn-icon" id="new-folder-btn" title="New folder" aria-label="New folder">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
                 </button>
+                <button class="btn btn-sm btn-icon" id="search-btn" title="Search files" aria-label="Search files">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4"/><line x1="10" y1="10" x2="14" y2="14"/></svg>
+                </button>
                 <button class="btn btn-sm btn-icon" id="split-pane-btn" title="Toggle split pane" aria-label="Toggle split pane">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
                 </button>
@@ -105,9 +108,6 @@
                 </button>
                 <button class="btn btn-sm btn-icon" id="forward-btn" disabled title="Forward" aria-label="Forward">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-                <button class="btn btn-sm btn-icon" id="search-btn" title="Search files" aria-label="Search files">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4"/><line x1="10" y1="10" x2="14" y2="14"/></svg>
                 </button>
             </div>
             <div id="search-panel" class="hidden">
@@ -120,11 +120,17 @@
                     <input id="search-exclude" type="text" placeholder="Exclude: *.log, node_modules" autocomplete="off" spellcheck="false"/>
                 </div>
                 <label id="search-content-label">
-                    <input id="search-content-toggle" type="checkbox"/>
+                    <input id="search-content-toggle" type="checkbox" class="pill-toggle"/>
                     <span>Search content</span>
                 </label>
             </div>
             <ul id="file-list"></ul>
+            <div id="git-filter-bar" style="display:none">
+                <label id="git-filter-label">
+                    <input type="checkbox" id="git-filter-checkbox" class="pill-toggle">
+                    <span><span class="git-change-count">0</span> changes</span>
+                </label>
+            </div>
         </aside>
         <div id="resize-handle"></div>
         <div id="editor-container">
@@ -139,6 +145,7 @@
                 <div id="s3-datasheet" style="display:none"></div>
                 <div id="s3-treeview" style="display:none"></div>
                 <div id="image-viewer" style="display:none"></div>
+                <div id="diff-view" style="display:none"></div>
             </section>
             <div id="split-resize-handle" style="display:none"></div>
             <section class="pane" id="pane2" style="display:none">
@@ -152,6 +159,7 @@
                 <div id="s3-datasheet-p2" style="display:none"></div>
                 <div id="s3-treeview-p2" style="display:none"></div>
                 <div id="image-viewer-p2" style="display:none"></div>
+                <div id="diff-view-p2" style="display:none"></div>
             </section>
         </div>
     </main>
@@ -183,6 +191,8 @@
 <script src="js/autosave.js"></script>
 <script src="js/split-pane.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/git.js"></script>
+<script src="js/diff.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/sidebar.js"></script>
 <script src="js/init.js"></script>

@@ -485,3 +485,36 @@ test.describe('syntax highlighting', () => {
         await expect(page.locator('#source-editor-wrap')).toBeVisible();
     });
 });
+
+// ── Word wrap toggle ──────────────────────────────────────────────────────────
+
+test.describe('word wrap toggle', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+        await page.evaluate(() => window.__mockFS.setTree({ 'notes.md': '# Hello' }));
+        await page.locator('#open-folder').click();
+        await page.locator('#file-list li').first().waitFor({ state: 'visible' });
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'notes.md' }).click();
+        await page.locator('#mode-toolbar').waitFor({ state: 'visible' });
+    });
+
+    test('wrap checkbox is visible in the mode toolbar', async ({ page }) => {
+        await expect(page.locator('#wrap-toggle')).toBeVisible();
+    });
+
+    test('wrap is unchecked by default', async ({ page }) => {
+        await expect(page.locator('#wrap-toggle')).not.toBeChecked();
+    });
+
+    test('checking wrap adds word-wrap-on class to editor wrap', async ({ page }) => {
+        await page.locator('#wrap-toggle').check();
+        await expect(page.locator('#source-editor-wrap')).toHaveClass(/word-wrap-on/);
+    });
+
+    test('unchecking wrap removes word-wrap-on class', async ({ page }) => {
+        await page.locator('#wrap-toggle').check();
+        await page.locator('#wrap-toggle').uncheck();
+        await expect(page.locator('#source-editor-wrap')).not.toHaveClass(/word-wrap-on/);
+    });
+});
