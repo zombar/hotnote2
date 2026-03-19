@@ -240,6 +240,18 @@ function determineInitialMode(ext, content, paneState) {
     }
 
     ps.editorMode = 'source';
+
+    // Auto-switch to diff when git filter is active and file has uncommitted changes
+    if (state.gitFilterActive && state.gitAvailable && ps.currentRelativePath &&
+            state.gitChangedPaths.has(ps.currentRelativePath)) {
+        ps.editorMode = 'diff';
+    }
+}
+
+function applyWordWrap(paneId) {
+    const ps = getPaneState(paneId);
+    const wrapEl = getPaneEl('source-editor-wrap', paneId);
+    if (wrapEl) wrapEl.classList.toggle('word-wrap-on', ps.wordWrap);
 }
 
 function renderEditor(content, filename, paneId = 'pane1') {
@@ -262,6 +274,7 @@ function renderEditor(content, filename, paneId = 'pane1') {
 
     updateModeToolbar(paneId);
     switchToMode(ps.editorMode, paneId, content);
+    applyWordWrap(paneId);
 }
 
 function updateModeToolbar(paneId = 'pane1') {
@@ -297,6 +310,10 @@ function updateModeToolbar(paneId = 'pane1') {
         ${hasTree ? `<button class="btn btn-sm${ps.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview${sfx}">Tree</button>` : ''}
         ${showDiff ? `<button class="btn btn-sm${ps.editorMode === 'diff' ? ' active' : ''}" id="mode-diff${sfx}">Diff</button>` : ''}
         <span id="filename-display${sfx}" class="filename-display">${escapeHtml(ps.currentFilename)}</span>
+        <label class="wrap-toggle-label" title="Toggle word wrap">
+            <input type="checkbox" id="wrap-toggle${sfx}" class="pill-toggle"${ps.wordWrap ? ' checked' : ''}>
+            <span>wrap</span>
+        </label>
     `;
 
     document.getElementById(`mode-source${sfx}`)?.addEventListener('click', () => switchToMode('source', paneId));
@@ -304,6 +321,10 @@ function updateModeToolbar(paneId = 'pane1') {
     document.getElementById(`mode-datasheet${sfx}`)?.addEventListener('click', () => switchToMode('datasheet', paneId));
     document.getElementById(`mode-treeview${sfx}`)?.addEventListener('click', () => switchToMode('treeview', paneId));
     document.getElementById(`mode-diff${sfx}`)?.addEventListener('click', () => switchToMode('diff', paneId));
+    document.getElementById(`wrap-toggle${sfx}`)?.addEventListener('change', (e) => {
+        ps.wordWrap = e.target.checked;
+        applyWordWrap(paneId);
+    });
 }
 
 async function resolveLocalImages(container) {
@@ -431,10 +452,11 @@ function switchToMode(mode, paneId = 'pane1', content) {
                 diffView.innerHTML = '<div class="diff-loading">Loading diff\u2026</div>';
                 const _relPath = ps.currentRelativePath;
                 const _currentContent = textarea ? textarea.value : '';
+                const _lang = getExtension(ps.currentFilename);
                 readHeadBlob(state.rootHandle, _relPath).then(headContent => {
                     if (ps.editorMode !== 'diff') return; // mode switched away
                     const status = headContent === null ? 'untracked' : 'modified';
-                    diffView.innerHTML = renderDiff(headContent ?? '', _currentContent, status);
+                    diffView.innerHTML = renderDiff(headContent ?? '', _currentContent, status, _lang);
                 }).catch(() => {
                     if (ps.editorMode === 'diff') {
                         diffView.innerHTML = '<div class="diff-clean">Could not load HEAD content</div>';

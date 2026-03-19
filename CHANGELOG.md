@@ -1,3 +1,14 @@
+## [0.9.0] — 2026-03-19
+
+### Added
+- **Git integration**: when a folder is opened inside a git repository, HotNote reads `.git/` directly via the File System Access API — no shell commands or backend required
+- **Changed files indicator**: orange dots appear next to modified files and folders in the sidebar, positioned to the left of the file icon
+- **Changes filter**: a "N changes" checkbox in the sidebar footer filters the file tree and search results to show only modified files; toggling a folder open while filtered shows only changed children
+- **Diff mode**: a "Diff" button in the mode toolbar shows a unified diff against HEAD — hunk headers, two-column line numbers (new line number for context lines, blank old column), syntax highlighting on added/context lines (none on deleted lines), and CVD-safe colouring; diff view auto-opens when the changes filter is active and a changed file is opened
+- **Pack file support**: git objects stored in `.git/objects/pack/` are fully parsed (pack index v2 binary search, deflate-raw decompression, OFS_DELTA and REF_DELTA reconstruction), enabling diff in repos cloned from remotes where all objects are packed
+- **Word wrap toggle**: a right-aligned "wrap" pill-checkbox in each pane's mode toolbar toggles word wrap on/off (default off); state is tracked independently per pane in split mode
+- **E2E tests**: 10 new tests covering git dots, filter bar, diff rendering (added/removed/unchanged lines, hunk headers, untracked files, syntax highlighting, line numbers, auto-diff), search+filter interaction, and word wrap (suite grows to 139)
+
 ## [0.8.2] — 2026-03-18
 
 ### Fixed

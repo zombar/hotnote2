@@ -83,8 +83,8 @@ function updateGitFilterBar() {
     bar.style.display = '';
     const countEl = bar.querySelector('.git-change-count');
     if (countEl) countEl.textContent = count;
-    const btn = bar.querySelector('#git-filter-btn');
-    if (btn) btn.classList.toggle('active', state.gitFilterActive);
+    const checkbox = document.getElementById('git-filter-checkbox');
+    if (checkbox) checkbox.checked = state.gitFilterActive;
 }
 
 const CHEVRON_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
@@ -112,9 +112,8 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
 
         li.innerHTML = `<div class="file-entry-row">
             <button class="folder-toggle" aria-label="Toggle ${escapeHtml(entry.name)}">${CHEVRON_SVG}</button>
-            <span class="icon">${icon}</span>
+            ${gitDot}<span class="icon">${icon}</span>
             <span class="name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
-            ${gitDot}
             ${deleteBtn}
         </div>`;
 
@@ -148,9 +147,8 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
 
         li.innerHTML = `<div class="file-entry-row" title="${tooltip}">
             <span class="toggle-spacer"></span>
-            <span class="icon">${icon}</span>
+            ${gitDotFile}<span class="icon">${icon}</span>
             <span class="name">${escapeHtml(entry.name)}</span>
-            ${gitDotFile}
             ${deleteBtn}
         </div>`;
 
@@ -272,6 +270,17 @@ async function toggleFolder(li, handle, dirRelPath) {
         li.classList.remove('expanded');
         alert(`Failed to read folder: ${err.message}`);
         return;
+    }
+
+    // Apply git filter to expanded folder contents
+    if (state.gitFilterActive && state.gitChangedPaths.size > 0) {
+        entries = entries.filter(e => {
+            const rp = dirRelPath ? dirRelPath + '/' + e.name : e.name;
+            if (e.kind === 'directory') {
+                return [...state.gitChangedPaths].some(p => p.startsWith(rp + '/'));
+            }
+            return state.gitChangedPaths.has(rp);
+        });
     }
 
     const childUl = document.createElement('ul');
@@ -568,7 +577,12 @@ async function performSearch(query, includeContent, excludePatterns) {
     const list = document.getElementById('file-list');
     list.innerHTML = '<li class="search-status">Searching…</li>';
 
-    const allFiles = await getAllFiles(state.rootHandle, '');
+    let allFiles = await getAllFiles(state.rootHandle, '');
+
+    // When the changes filter is active, restrict search to changed files only
+    if (state.gitFilterActive && state.gitChangedPaths.size > 0) {
+        allFiles = allFiles.filter(f => state.gitChangedPaths.has(f.relPath));
+    }
 
     const nameMatches = allFiles.filter(f =>
         f.name.toLowerCase().includes(query.toLowerCase()) &&

@@ -86,8 +86,8 @@ test.describe('git available', () => {
         // Before filter: both files visible
         await expect(page.locator('#file-list li.file-entry')).toHaveCount(2);
 
-        // Click filter button
-        await page.locator('#git-filter-btn').click();
+        // Check the filter checkbox
+        await page.locator('#git-filter-checkbox').check();
 
         // After filter: only notes.md visible
         await expect(page.locator('#file-list li.file-entry')).toHaveCount(1);
@@ -99,11 +99,20 @@ test.describe('git available', () => {
         await openMockFolder(page, { 'notes.md': '# Hello', 'clean.md': '# Clean' });
         await page.locator('#git-filter-bar').waitFor({ state: 'visible' });
 
-        await page.locator('#git-filter-btn').click();
+        await page.locator('#git-filter-checkbox').check();
         await expect(page.locator('#file-list li.file-entry')).toHaveCount(1);
 
-        await page.locator('#git-filter-btn').click();
+        await page.locator('#git-filter-checkbox').uncheck();
         await expect(page.locator('#file-list li.file-entry')).toHaveCount(2);
+    });
+
+    test('git dot appears to the left of the file icon', async ({ page }) => {
+        await page.evaluate(() => window.__mockGit.setChangedPaths(['notes.md']));
+        await openMockFolder(page, { 'notes.md': '# Hello' });
+        const row = page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'notes.md' });
+        const dotBox = await row.locator('.git-dot').boundingBox();
+        const iconBox = await row.locator('.icon').boundingBox();
+        expect(dotBox.x).toBeLessThan(iconBox.x);
     });
 });
 
@@ -199,5 +208,82 @@ test.describe('diff mode', () => {
 
         await expect(page.locator('#diff-view .diff-hunk')).toBeVisible();
         await expect(page.locator('#diff-view .diff-hunk')).toContainText('@@');
+    });
+
+    test('changed file opens in diff mode when filter is active', async ({ page }) => {
+        await page.evaluate(() => {
+            window.__mockGit.setChangedPaths(['notes.md']);
+            window.__mockGit.setHeadBlob('notes.md', 'old\n');
+        });
+        await openMockFolder(page, { 'notes.md': 'new\n', 'clean.md': '# Clean' });
+        await page.locator('#git-filter-bar').waitFor({ state: 'visible' });
+        await page.locator('#git-filter-checkbox').check();
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'notes.md' }).click();
+        await expect(page.locator('#diff-view')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#mode-diff')).toHaveClass(/active/);
+    });
+
+    test('deleted lines have no syntax highlighting', async ({ page }) => {
+        await page.evaluate(() => {
+            window.__mockGit.setChangedPaths(['code.js']);
+            window.__mockGit.setHeadBlob('code.js', 'const x = 1;\n');
+        });
+        await openMockFolder(page, { 'code.js': 'const y = 2;\n' });
+        await openFile(page, 'code.js');
+        await page.locator('#mode-diff').click();
+        const delLine = page.locator('#diff-view .diff-del');
+        await expect(delLine).toBeVisible();
+        const tokCount = await delLine.locator('[class^="tok-"]').count();
+        expect(tokCount).toBe(0);
+    });
+
+    test('added lines have syntax highlighting for JS files', async ({ page }) => {
+        await page.evaluate(() => {
+            window.__mockGit.setChangedPaths(['code.js']);
+            window.__mockGit.setHeadBlob('code.js', '');
+        });
+        await openMockFolder(page, { 'code.js': 'const x = 1;\n' });
+        await openFile(page, 'code.js');
+        await page.locator('#mode-diff').click();
+        const addLine = page.locator('#diff-view .diff-add');
+        await expect(addLine).toBeVisible();
+        await expect(addLine.locator('.tok-keyword')).toContainText('const');
+    });
+
+    test('context lines show only new line number', async ({ page }) => {
+        await page.evaluate(() => {
+            window.__mockGit.setChangedPaths(['notes.md']);
+            window.__mockGit.setHeadBlob('notes.md', 'line1\nline2\nline3\n');
+        });
+        await openMockFolder(page, { 'notes.md': 'line1\nline2\nchanged\n' });
+        await openFile(page, 'notes.md');
+        await page.locator('#mode-diff').click();
+        const eqLine = page.locator('#diff-view .diff-eq').first();
+        await expect(eqLine.locator('.diff-ln-old')).toHaveText('');
+        const newNum = await eqLine.locator('.diff-ln-new').textContent();
+        expect(newNum.trim()).not.toBe('');
+    });
+});
+
+// ── Search with git filter ────────────────────────────────────────────────────
+
+test.describe('search with git filter', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_FS });
+        await page.addInitScript({ path: MOCK_GIT });
+        await page.goto('/');
+    });
+
+    test('search returns only changed files when filter is active', async ({ page }) => {
+        await page.evaluate(() => window.__mockGit.setChangedPaths(['notes.md']));
+        await openMockFolder(page, { 'notes.md': '# Hello', 'readme.md': '# Readme' });
+        await page.locator('#git-filter-bar').waitFor({ state: 'visible' });
+        await page.locator('#git-filter-checkbox').check();
+        await page.locator('#search-btn').click();
+        await page.locator('#search-input').fill('.md');
+        await page.locator('#file-list li.search-result').first().waitFor({ state: 'visible' });
+        const names = await page.locator('#file-list li.search-result .name').allTextContents();
+        expect(names).toContain('notes.md');
+        expect(names).not.toContain('readme.md');
     });
 });

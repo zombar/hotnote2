@@ -30,9 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
         await refreshGitStatus();
     });
 
-    // Git changes filter button
-    document.getElementById('git-filter-btn')?.addEventListener('click', () => {
-        state.gitFilterActive = !state.gitFilterActive;
+    // Git changes filter checkbox
+    document.getElementById('git-filter-checkbox')?.addEventListener('change', (e) => {
+        state.gitFilterActive = e.target.checked;
         updateGitFilterBar();
         renderSidebar();
     });
@@ -239,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const charNum = parseInt(banner?.dataset.char || '0', 10) || 0;
         dismissResumePrompt();
         await openFolder();
+        await refreshGitStatus();
         if (filePath && state.rootHandle) {
             await openFileByPath(state.rootHandle, filePath, lineNum, charNum);
         }

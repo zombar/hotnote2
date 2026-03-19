@@ -60,7 +60,7 @@
         </div>
         <div class="header-right">
             <label class="autosave-toggle" id="autosave-toggle-label" title="Automatically save changes after 2 seconds of inactivity">
-                <input type="checkbox" id="autosave-checkbox" aria-label="Autosave" />
+                <input type="checkbox" id="autosave-checkbox" class="pill-toggle" aria-label="Autosave" />
                 <span id="autosave-label">autosave</span>
             </label>
             <button class="btn btn-sm btn-icon" id="save-btn" disabled title="Save file (Ctrl+S / Cmd+S)" aria-label="Save file">
@@ -120,15 +120,16 @@
                     <input id="search-exclude" type="text" placeholder="Exclude: *.log, node_modules" autocomplete="off" spellcheck="false"/>
                 </div>
                 <label id="search-content-label">
-                    <input id="search-content-toggle" type="checkbox"/>
+                    <input id="search-content-toggle" type="checkbox" class="pill-toggle"/>
                     <span>Search content</span>
                 </label>
             </div>
             <ul id="file-list"></ul>
             <div id="git-filter-bar" style="display:none">
-                <button class="btn btn-sm" id="git-filter-btn">
-                    <span class="git-change-count">0</span> changes
-                </button>
+                <label id="git-filter-label">
+                    <input type="checkbox" id="git-filter-checkbox" class="pill-toggle">
+                    <span><span class="git-change-count">0</span> changes</span>
+                </label>
             </div>
         </aside>
         <div id="resize-handle"></div>

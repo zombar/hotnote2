@@ -352,8 +352,8 @@ main {
     user-select: none;
 }
 
-/* Custom pill toggle for search-content-toggle */
-#search-content-toggle {
+/* Shared pill toggle — used for search-content-toggle, git-filter-checkbox, autosave */
+.pill-toggle {
     appearance: none;
     -webkit-appearance: none;
     flex-shrink: 0;
@@ -366,7 +366,7 @@ main {
     position: relative;
     transition: background 0.15s, border-color 0.15s;
 }
-#search-content-toggle::after {
+.pill-toggle::after {
     content: '';
     position: absolute;
     top: 2px;
@@ -377,15 +377,15 @@ main {
     background: var(--color-text-tertiary);
     transition: transform 0.15s, background 0.15s;
 }
-#search-content-toggle:checked {
+.pill-toggle:checked {
     background: var(--color-bg-tertiary);
     border-color: var(--color-text-secondary);
 }
-#search-content-toggle:checked::after {
+.pill-toggle:checked::after {
     transform: translateX(12px);
     background: var(--color-text-primary);
 }
-#search-content-toggle:focus-visible {
+.pill-toggle:focus-visible {
     outline: 1px solid var(--color-text-secondary);
     outline-offset: 1px;
 }
@@ -641,6 +641,8 @@ main {
 }
 
 #mode-toolbar .filename-display, #mode-toolbar-p2 .filename-display {
+    flex: 1;
+    min-width: 0;
     margin-left: 0.5rem;
     font-family: var(--font-mono);
     font-size: 0.7rem;
@@ -649,6 +651,17 @@ main {
     text-overflow: ellipsis;
     white-space: nowrap;
     letter-spacing: 0.02em;
+}
+.wrap-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-left: 0.5rem;
+    user-select: none;
 }
 
 .empty-state {
@@ -709,8 +722,7 @@ main {
     font-size: 0.8125rem;
     line-height: 1.5;
     tab-size: 4;
-    white-space: pre-wrap;
-    word-break: break-word;
+    white-space: pre;
     overflow: hidden;
     pointer-events: none;
     color: var(--color-text-primary);
@@ -720,8 +732,7 @@ main {
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
-    white-space: pre-wrap;
-    word-break: break-word;
+    white-space: pre;
     tab-size: 4;
 }
 
@@ -743,10 +754,27 @@ main {
     padding: 0.75rem 0.75rem 0.75rem calc(3.25rem + 0.75rem);
     overflow: auto;
     tab-size: 4;
-    white-space: pre-wrap;
-    word-break: break-word;
+    white-space: pre;
     z-index: 1;
     display: block;
+}
+
+/* Word wrap on */
+#source-editor-wrap.word-wrap-on #source-editor,
+#source-editor-wrap-p2.word-wrap-on #source-editor-p2 {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: hidden;
+}
+#source-editor-wrap.word-wrap-on #source-highlight-backdrop,
+#source-editor-wrap-p2.word-wrap-on #source-highlight-backdrop-p2 {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+#source-editor-wrap.word-wrap-on #source-highlight-backdrop code,
+#source-editor-wrap-p2.word-wrap-on #source-highlight-backdrop-p2 code {
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 /* Token colors for source editor backdrop */
@@ -1298,7 +1326,6 @@ main {
     user-select: none;
 }
 .autosave-toggle input {
-    accent-color: var(--color-text-primary);
     cursor: pointer;
 }
 #autosave-label {
@@ -1534,16 +1561,20 @@ html[data-theme="light"] #update-banner {
     padding: 0.375rem 0.625rem;
     background: var(--color-bg-toolbar);
 }
-#git-filter-bar .btn {
-    width: 100%;
-    justify-content: center;
+#git-filter-label {
+    display: flex;
+    align-items: center;
     gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    user-select: none;
 }
-#git-filter-btn.active {
-    background: var(--color-bg-tertiary);
-    border-color: var(--color-border-primary);
+#git-filter-label:hover {
     color: var(--color-text-primary);
-    box-shadow: var(--shadow-sm), var(--highlight-top), inset 0 -2px 0 var(--color-text-primary);
+}
+#git-filter-checkbox {
+    cursor: pointer;
 }
 .git-change-count {
     font-variant-numeric: tabular-nums;
@@ -1570,6 +1601,16 @@ html[data-theme="light"] #update-banner {
     border-left: 2px solid transparent;
     padding: 0 0.75rem;
 }
+.diff-ln {
+    width: 3ch;
+    flex-shrink: 0;
+    user-select: none;
+    color: var(--color-text-tertiary);
+    text-align: right;
+    padding-right: 0.5rem;
+    font-variant-numeric: tabular-nums;
+}
+.diff-ln-new { padding-right: 0.75rem; }
 .diff-gutter {
     width: 1rem;
     flex-shrink: 0;
@@ -1585,26 +1626,30 @@ html[data-theme="light"] #update-banner {
     flex: 1;
     min-width: 0;
 }
+#diff-view .tok-keyword,  #diff-view-p2 .tok-keyword  { color: var(--tok-keyword); font-weight: 600; }
+#diff-view .tok-type,     #diff-view-p2 .tok-type     { color: var(--tok-type); }
+#diff-view .tok-string,   #diff-view-p2 .tok-string   { color: var(--tok-string); }
+#diff-view .tok-number,   #diff-view-p2 .tok-number   { color: var(--tok-number); }
+#diff-view .tok-comment,  #diff-view-p2 .tok-comment  { color: var(--tok-comment); font-style: italic; }
+#diff-view .tok-builtin,  #diff-view-p2 .tok-builtin  { color: var(--tok-builtin); }
+#diff-view .tok-operator, #diff-view-p2 .tok-operator { color: var(--tok-operator); }
 
-/* Added lines: lighter bg + solid left border + bold gutter symbol */
+/* Added lines: bg-tertiary tint + solid left border + bold gutter symbol */
 .diff-add {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--color-bg-tertiary);
     border-left-color: var(--color-text-secondary);
     border-left-style: solid;
 }
-html[data-theme="light"] .diff-add {
-    background: rgba(0, 0, 0, 0.03);
-}
 .diff-add .diff-gutter { color: var(--color-text-primary); font-weight: 700; }
 
-/* Removed lines: darker bg + dashed left border + strikethrough text */
+/* Removed lines: subtler bg + dashed left border + strikethrough text */
 .diff-del {
-    background: rgba(0, 0, 0, 0.12);
+    background: var(--color-bg-secondary);
     border-left-color: var(--color-text-tertiary);
     border-left-style: dashed;
 }
 html[data-theme="light"] .diff-del {
-    background: rgba(0, 0, 0, 0.06);
+    background: rgba(0, 0, 0, 0.04);
 }
 .diff-del code {
     text-decoration: line-through;

@@ -79,6 +79,8 @@ const state = {
     // Search state
     searchActive: false,
     searchQuery: '',
+    // Editor display
+    wordWrap: false,
     // Git state
     gitAvailable: false,
     gitChangedPaths: new Set(),
@@ -107,6 +109,7 @@ const state = {
         filePositionCache: {},
         autosaveEnabled: false,
         autosaveTimer: null,
+        wordWrap: false,
         currentRelativePath: null,
         currentLine: 1,
         currentChar: 1,

@@ -87,7 +87,18 @@ function computeLineDiff(oldText, newText) {
 // HTML renderer — unified diff with 3-line context hunks
 // ---------------------------------------------------------------------------
 
-function renderDiff(oldText, newText, status) {
+function _diffLineHtml(cls, gutter, oldN, newN, text, lang) {
+    const o = oldN !== null ? oldN : '';
+    const n = newN !== null ? newN : '';
+    const highlighted = lang ? highlightCode(text, lang) : escapeHtml(text);
+    return `<div class="diff-line ${cls}">` +
+        `<span class="diff-ln diff-ln-old" aria-hidden="true">${o}</span>` +
+        `<span class="diff-ln diff-ln-new" aria-hidden="true">${n}</span>` +
+        `<span class="diff-gutter" aria-hidden="true">${gutter}</span>` +
+        `<code>${highlighted}</code></div>`;
+}
+
+function renderDiff(oldText, newText, status, lang = '') {
     // status: 'untracked' | 'modified'
     if (status === 'untracked') {
         const lines = newText ? newText.split('\n') : [];
@@ -96,8 +107,8 @@ function renderDiff(oldText, newText, status) {
             return '<div class="diff-untracked">New untracked file (empty)</div>';
         }
         let html = '<div class="diff-untracked">New untracked file</div>';
-        for (const line of lines) {
-            html += `<div class="diff-line diff-add"><span class="diff-gutter" aria-hidden="true">+</span><code>${escapeHtml(line)}</code></div>`;
+        for (let i = 0; i < lines.length; i++) {
+            html += _diffLineHtml('diff-add', '+', null, i + 1, lines[i], lang);
         }
         return html;
     }
@@ -147,11 +158,11 @@ function renderDiff(oldText, newText, status) {
 
         for (const l of hunkLines) {
             if (l.type === 'eq') {
-                html += `<div class="diff-line diff-eq"><span class="diff-gutter" aria-hidden="true"> </span><code>${escapeHtml(l.text)}</code></div>`;
+                html += _diffLineHtml('diff-eq', '\u00a0', null, l.nl, l.text, lang);
             } else if (l.type === 'add') {
-                html += `<div class="diff-line diff-add"><span class="diff-gutter" aria-hidden="true">+</span><code>${escapeHtml(l.text)}</code></div>`;
+                html += _diffLineHtml('diff-add', '+', null, l.nl, l.text, lang);
             } else {
-                html += `<div class="diff-line diff-del"><span class="diff-gutter" aria-hidden="true">-</span><code>${escapeHtml(l.text)}</code></div>`;
+                html += _diffLineHtml('diff-del', '-', l.ol, null, l.text, '');
             }
         }
 
