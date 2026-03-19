@@ -7,12 +7,18 @@
 async function openFolder() {
     try {
         const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        if (state.splitMode) toggleSplitPane();
         state.rootHandle = handle;
         state.currentDirHandle = handle;
         state.pathStack = [{ handle, name: handle.name }];
         state.currentFileHandle = null;
         state.currentFilename = '';
         clearEditor();
+        state.fileHistory = [];
+        state.fileHistoryIndex = -1;
+        state.pane2.fileHistory = [];
+        state.pane2.fileHistoryIndex = -1;
+        updateNavButtons();
         const sidebarEl = document.getElementById('sidebar');
         sidebarEl.style.display = '';
         sidebarEl.classList.remove('collapsed');
