@@ -1506,6 +1506,15 @@ html[data-theme="light"] #update-banner {
 }
 .cl-body li { margin: 0.15rem 0; }
 
+.welcome-footer {
+    margin-top: auto;
+    padding: 1rem 0 0;
+    font-size: 0.75rem;
+    color: var(--color-text-tertiary);
+    text-align: center;
+    letter-spacing: 0.03em;
+}
+
 /* =========================================================================
    Toast Notifications
    ========================================================================= */
@@ -1587,7 +1596,7 @@ html[data-theme="light"] #update-banner {
 /* Diff view container */
 #diff-view, #diff-view-p2 {
     flex: 1;
-    overflow-y: auto;
+    overflow: auto;
     font-family: var(--font-mono);
     font-size: 0.8rem;
     line-height: 1.5;
@@ -1600,6 +1609,7 @@ html[data-theme="light"] #update-banner {
     align-items: baseline;
     border-left: 2px solid transparent;
     padding: 0 0.75rem;
+    min-width: max-content;
 }
 .diff-ln {
     width: 3ch;
@@ -1621,8 +1631,7 @@ html[data-theme="light"] #update-banner {
 .diff-line code {
     font-family: inherit;
     font-size: inherit;
-    white-space: pre-wrap;
-    word-break: break-word;
+    white-space: pre;
     flex: 1;
     min-width: 0;
 }

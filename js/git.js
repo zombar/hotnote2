@@ -117,12 +117,7 @@ async function _parseTreeRaw(raw) {
 async function _walkTree(rootHandle, treeSha, pathParts) {
     if (!pathParts.length) return null;
 
-    let obj;
-    try {
-        obj = await readGitObject(rootHandle, treeSha);
-    } catch (_) {
-        return null;
-    }
+    const obj = await readGitObject(rootHandle, treeSha); // throws on pack error
     if (obj.type !== 'tree') return null;
 
     const entries = await _parseTreeRaw(obj.raw);
@@ -403,6 +398,8 @@ async function readHeadBlob(rootHandle, relPath) {
 
     if (!rootHandle || !relPath) return null;
 
+    // Phase 1: resolve commitSha from HEAD/packed-refs — return null on infra failure
+    let commitSha;
     try {
         const gitDir = await _getGitDir(rootHandle);
 
@@ -410,7 +407,6 @@ async function readHeadBlob(rootHandle, relPath) {
         const headFile = await gitDir.getFileHandle('HEAD');
         const headText = (await (await headFile.getFile()).text()).trim();
 
-        let commitSha;
         if (headText.startsWith('ref: ')) {
             const ref = headText.slice(5).trim(); // e.g. "refs/heads/main"
             // Try loose ref first
@@ -429,27 +425,26 @@ async function readHeadBlob(rootHandle, relPath) {
         } else {
             commitSha = headText; // detached HEAD
         }
-
-        if (!commitSha || commitSha.length !== 40) return null;
-
-        // 2. Read commit → get tree SHA
-        const commitObj = await readGitObject(rootHandle, commitSha);
-        if (commitObj.type !== 'commit') return null;
-        const commitText = new TextDecoder().decode(commitObj.raw);
-        const treeMatch = commitText.match(/^tree ([0-9a-f]{40})/m);
-        if (!treeMatch) return null;
-
-        // 3. Walk tree to find blob SHA
-        const blobSha = await _walkTree(rootHandle, treeMatch[1], relPath.split('/'));
-        if (!blobSha) return null;
-
-        // 4. Read and return blob content
-        const blobObj = await readGitObject(rootHandle, blobSha);
-        if (blobObj.type !== 'blob') return null;
-        return new TextDecoder().decode(blobObj.raw);
     } catch (_) {
-        return null;
+        return null; // .git/ inaccessible or not a git repo
     }
+
+    if (!commitSha || commitSha.length !== 40) return null;
+
+    // Phase 2: read objects — errors propagate (not caught here)
+    const commitObj = await readGitObject(rootHandle, commitSha);
+    if (commitObj.type !== 'commit') return null;
+    const commitText = new TextDecoder().decode(commitObj.raw);
+    const treeMatch = commitText.match(/^tree ([0-9a-f]{40})/m);
+    if (!treeMatch) return null;
+
+    // Walk tree to find blob SHA
+    const blobSha = await _walkTree(rootHandle, treeMatch[1], relPath.split('/'));
+    if (!blobSha) return null; // path genuinely not in HEAD = new/untracked file
+
+    const blobObj = await readGitObject(rootHandle, blobSha);
+    if (blobObj.type !== 'blob') return null;
+    return new TextDecoder().decode(blobObj.raw);
 }
 
 async function refreshGitStatus() {

@@ -2,6 +2,7 @@
 const { test, expect } = require('@playwright/test');
 
 const MOCK_SCRIPT = 'tests/helpers/mock-fs.js';
+const MOCK_GIT = 'tests/helpers/mock-git.js';
 
 async function openMockFolder(page, tree, rootName = 'my-notes') {
     await page.evaluate(({ tree, rootName }) => window.__mockFS.setTree(tree, rootName), { tree, rootName });
@@ -138,5 +139,47 @@ test.describe('folder re-open resets state', () => {
         await page.locator('#file-list li').first().waitFor({ state: 'visible' });
 
         await expect(page.locator('#back-btn')).toBeDisabled();
+    });
+});
+
+// ── Diff view in split pane ───────────────────────────────────────────────────
+
+test.describe('diff view in split pane', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.addInitScript({ path: MOCK_GIT });
+        await page.goto('/');
+    });
+
+    test('long diff lines scroll horizontally instead of wrapping', async ({ page }) => {
+        const longLine = 'x'.repeat(300);
+        const headContent = longLine + '\n';
+        const currentContent = longLine + ' CHANGED\n';
+
+        await page.evaluate(() => window.__mockGit.setChangedPaths(['code.js']));
+        await page.evaluate(({ head }) => window.__mockGit.setHeadBlob('code.js', head), { head: headContent });
+        await openMockFolder(page, { 'code.js': currentContent });
+        await clickFile(page, 'code.js');
+
+        // Open split pane and activate diff in pane2
+        await page.locator('#split-pane-btn').click();
+        await expect(page.locator('#pane2')).toBeVisible();
+        await page.locator('#mode-diff-p2').click();
+
+        const diffView = page.locator('#diff-view-p2');
+        await expect(diffView).toBeVisible({ timeout: 5000 });
+        await expect(diffView.locator('.diff-line')).not.toHaveCount(0);
+
+        // The diff container must be horizontally scrollable (scrollWidth > clientWidth)
+        const overflows = await diffView.evaluate(el => el.scrollWidth > el.clientWidth);
+        expect(overflows).toBe(true);
+
+        // No diff-line code element should have wrapped (offsetHeight ≤ 2× a single line height)
+        const wrapped = await diffView.evaluate(el => {
+            const lines = el.querySelectorAll('.diff-line code');
+            const singleLineH = parseFloat(getComputedStyle(el).lineHeight) || 20;
+            return Array.from(lines).some(c => c.offsetHeight > singleLineH * 1.5);
+        });
+        expect(wrapped).toBe(false);
     });
 });

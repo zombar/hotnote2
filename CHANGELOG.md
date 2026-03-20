@@ -1,3 +1,11 @@
+## [0.9.2] — 2026-03-20
+
+### Fixed
+- **Diff shows entire file as created on cloned repos**: `_walkTree` had a silent `try/catch` that returned `null` on any object-read error, making pack-file failures indistinguishable from "file not in HEAD tree"; `readHeadBlob` then treated the file as untracked and rendered every line as an addition. Fix: errors from reading git objects now propagate — if pack reading genuinely fails, the diff view shows "Could not load HEAD content" instead of a false "entire file created" diff; truly new/untracked files still show all lines as additions as before.
+
+### Added
+- **Welcome screen footer**: version number and copyright (`v0.9.2 · © 2026 FORGE3D CYF`) now appear at the bottom of the welcome screen (shown when no folder is open)
+
 ## [0.9.1] — 2026-03-19
 
 ### Fixed
