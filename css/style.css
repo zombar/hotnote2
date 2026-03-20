@@ -1609,6 +1609,7 @@ html[data-theme="light"] #update-banner {
     align-items: baseline;
     border-left: 2px solid transparent;
     padding: 0 0.75rem;
+    min-width: max-content;
 }
 .diff-ln {
     width: 3ch;

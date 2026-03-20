@@ -1,4 +1,4 @@
-const CACHE = 'hotnote-89f365a';
+const CACHE = 'hotnote-0a4da6b';
 const SHELL = ['/', '/index.html', '/manifest.json', '/icon-512.png',
                '/css/style.css', '/js/hotnote.js', '/js/lib-markdown.js', '/js/lib-format.js'];
 
