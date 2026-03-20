@@ -88,6 +88,14 @@ await page.clock.fastForward(2500);  // advance 2.5s for autosave
 - Image viewer (createObjectURL not available in mock environment)
 - Mobile auto-collapse (viewport simulation, edge case)
 
+## Git Workflow
+
+Always pull `main` before creating a feature branch:
+```
+git checkout main && git pull origin main
+git checkout -b feature/my-feature
+```
+
 ## Other Make Targets
 - `make lint` — ESLint on `js/` only (test files are excluded)
 - `make preview` — serve on port 8080 and open browser
