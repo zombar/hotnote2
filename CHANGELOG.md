@@ -1,3 +1,10 @@
+## [0.9.4] — 2026-03-20
+
+### Added
+- **Help panel**: `?` button in the header opens pane2 as a read-only help panel with two tabs — **Markdown Guide** (headings, emphasis, links, lists, blockquotes, code blocks, tables) and **Keyboard Shortcuts** (full shortcut reference table); a ✕ button closes the panel and restores the prior pane2 state; coexists cleanly with split-pane mode
+- **Ctrl+X cut-line**: in the source editor, Ctrl+X with a selection cuts it to the clipboard; with no selection, cuts and deletes the entire current line (matches VS Code behaviour)
+- **E2E tests**: 9 new tests covering help panel open/close, tab switching, content verification, split-pane coexistence, and Ctrl+X behaviour (suite grows to 189)
+
 ## [0.9.3] — 2026-03-20
 
 ### Fixed
