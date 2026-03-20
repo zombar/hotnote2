@@ -77,7 +77,7 @@ test.describe('split pane content', () => {
         await page.locator('#split-pane-btn').click();
         await expect(page.locator('#wysiwyg-p2 h1')).toContainText('Hello');
         // Edit pane1 source; debouncedSyncPreview re-renders pane2 wysiwyg after 300ms
-        await page.locator('#source-editor').fill('# Updated');
+        await page.evaluate(([p, v]) => window.setEditorValue(p, v), ['pane1', '# Updated']);
         await expect(page.locator('#wysiwyg-p2 h1')).toContainText('Updated', { timeout: 2000 });
     });
 

@@ -138,8 +138,11 @@
                 <div id="mode-toolbar" style="display:none"></div>
                 <div id="source-editor-wrap">
                     <div id="line-numbers" aria-hidden="true"></div>
-                    <pre id="source-highlight-backdrop" aria-hidden="true"><code id="source-highlight-code"></code></pre>
-                    <textarea id="source-editor" spellcheck="false"></textarea>
+                    <div id="source-editor-overlay" aria-hidden="true"></div>
+                    <div id="source-editor-ce" contenteditable="true" spellcheck="false"
+                         autocorrect="off" autocapitalize="off"
+                         role="textbox" aria-multiline="true" aria-label="Source editor"></div>
+                    <textarea id="source-editor" style="display:none" tabindex="-1" aria-hidden="true"></textarea>
                 </div>
                 <div id="wysiwyg" contenteditable="false"></div>
                 <div id="s3-datasheet" style="display:none"></div>
@@ -152,8 +155,11 @@
                 <div id="mode-toolbar-p2"></div>
                 <div id="source-editor-wrap-p2">
                     <div id="line-numbers-p2" aria-hidden="true"></div>
-                    <pre id="source-highlight-backdrop-p2" aria-hidden="true"><code id="source-highlight-code-p2"></code></pre>
-                    <textarea id="source-editor-p2" spellcheck="false"></textarea>
+                    <div id="source-editor-overlay-p2" aria-hidden="true"></div>
+                    <div id="source-editor-ce-p2" contenteditable="true" spellcheck="false"
+                         autocorrect="off" autocapitalize="off"
+                         role="textbox" aria-multiline="true" aria-label="Source editor pane 2"></div>
+                    <textarea id="source-editor-p2" style="display:none" tabindex="-1" aria-hidden="true"></textarea>
                 </div>
                 <div id="wysiwyg-p2" contenteditable="false"></div>
                 <div id="s3-datasheet-p2" style="display:none"></div>
@@ -195,6 +201,7 @@
 <script src="js/diff.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/sidebar.js"></script>
+<script src="js/source-editor.js"></script>
 <script src="js/init.js"></script>
 </body>
 </html>

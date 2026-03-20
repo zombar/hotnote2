@@ -5,6 +5,23 @@
 // =========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Init source editors (contenteditable engine)
+    window.sourceEditors = {};
+    window.sourceEditors.pane1 = initSourceEditor(
+        document.getElementById('source-editor-ce'),
+        document.getElementById('source-editor'),
+        document.getElementById('line-numbers'),
+        document.getElementById('source-editor-overlay'),
+        'pane1'
+    );
+    window.sourceEditors.pane2 = initSourceEditor(
+        document.getElementById('source-editor-ce-p2'),
+        document.getElementById('source-editor-p2'),
+        document.getElementById('line-numbers-p2'),
+        document.getElementById('source-editor-overlay-p2'),
+        'pane2'
+    );
+
     // Theme
     initTheme();
     document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
@@ -124,59 +141,35 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPaneFocus('pane1');
     setupPaneFocus('pane2');
 
-    // Pane1 textarea dirty tracking + highlight sync
+    // Pane1 mirror dirty tracking (input fires when CE engine calls _syncMirror)
     const sourceEditor = document.getElementById('source-editor');
     sourceEditor?.addEventListener('input', () => {
         setDirty('pane1');
         updateSourceHighlight('pane1');
 
-        // Same-file sync: if pane2 has the same file open, sync its content
+        // Same-file sync: if pane2 has the same file open, sync its CE engine content
         if (state.splitMode && state._panesHaveSameFile) {
             const textarea2 = document.getElementById('source-editor-p2');
             if (textarea2) textarea2.value = sourceEditor.value;
+            window.sourceEditors.pane2?.setValue(sourceEditor.value, { silent: true });
             updateSourceHighlight('pane2');
             debouncedSyncPreview('pane2');
         }
     });
 
-    // Pane2 textarea dirty tracking + highlight sync
+    // Pane2 mirror dirty tracking
     const sourceEditor2 = document.getElementById('source-editor-p2');
     sourceEditor2?.addEventListener('input', () => {
         setDirty('pane2');
         updateSourceHighlight('pane2');
 
-        // Same-file sync: if pane1 has the same file open, sync its content
+        // Same-file sync: if pane1 has the same file open, sync its CE engine content
         if (state.splitMode && state._panesHaveSameFile) {
             const textarea1 = document.getElementById('source-editor');
             if (textarea1) textarea1.value = sourceEditor2.value;
+            window.sourceEditors.pane1?.setValue(sourceEditor2.value, { silent: true });
             updateSourceHighlight('pane1');
             debouncedSyncPreview('pane1');
-        }
-    });
-
-    // Scroll sync: keep highlight backdrop and line numbers aligned with pane1 textarea
-    sourceEditor?.addEventListener('scroll', () => {
-        const backdrop = document.getElementById('source-highlight-backdrop');
-        const lineNums = document.getElementById('line-numbers');
-        if (backdrop) {
-            backdrop.scrollTop = sourceEditor.scrollTop;
-            backdrop.scrollLeft = sourceEditor.scrollLeft;
-        }
-        if (lineNums) {
-            lineNums.scrollTop = sourceEditor.scrollTop;
-        }
-    });
-
-    // Scroll sync for pane2
-    sourceEditor2?.addEventListener('scroll', () => {
-        const backdrop2 = document.getElementById('source-highlight-backdrop-p2');
-        const lineNums2 = document.getElementById('line-numbers-p2');
-        if (backdrop2) {
-            backdrop2.scrollTop = sourceEditor2.scrollTop;
-            backdrop2.scrollLeft = sourceEditor2.scrollLeft;
-        }
-        if (lineNums2) {
-            lineNums2.scrollTop = sourceEditor2.scrollTop;
         }
     });
 
@@ -260,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Track cursor line for URL/localStorage sync (pane1 only)
+    // The CE engine dispatches synthetic keyup/mouseup on the mirror after cursor moves.
     let _lineDebounce = null;
     function _updateCursorPosition() {
         const pos = sourceEditor.selectionStart || 0;
@@ -269,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(_lineDebounce);
         _lineDebounce = setTimeout(updateURL, 600);
     }
-    sourceEditor?.addEventListener('keyup', _updateCursorPosition);
+    sourceEditor?.addEventListener('keyup',   _updateCursorPosition);
     sourceEditor?.addEventListener('mouseup', _updateCursorPosition);
 
     // Autosave init

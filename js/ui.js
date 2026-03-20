@@ -104,6 +104,7 @@ function startFileWatcher() {
                     const content = await file.text();
                     const textarea = getPaneEl('source-editor', paneId);
                     if (textarea) textarea.value = content;
+                    window.sourceEditors?.[paneId === 'pane2' ? 'pane2' : 'pane1']?.setValue(content, { silent: true });
                     switchToMode(ps.editorMode, paneId, content);
                     showToast(`Reloaded: ${ps.currentFilename}`);
                     if (state._panesHaveSameFile) break;

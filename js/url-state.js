@@ -30,20 +30,15 @@ function clearURL() {
 }
 
 function scrollEditorToPosition(lineNum, charNum) {
-    const editor = document.getElementById('source-editor');
-    if (!editor || lineNum <= 1) return;
-    const lines = editor.value.split('\n');
+    const eng = window.sourceEditors?.pane1;
+    if (!eng || lineNum <= 1) return;
+    const lines = eng.getValue().split('\n');
     let pos = 0;
-    for (let i = 0; i < Math.min(lineNum - 1, lines.length); i++) {
-        pos += lines[i].length + 1;
-    }
-    if (charNum > 1) {
-        const lineLen = (lines[lineNum - 1] || '').length;
-        pos += Math.min(charNum - 1, lineLen);
-    }
-    editor.selectionStart = editor.selectionEnd = pos;
-    const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 20;
-    editor.scrollTop = Math.max(0, (lineNum - 1) * lineHeight - editor.clientHeight / 2);
+    for (let i = 0; i < Math.min(lineNum - 1, lines.length); i++) pos += lines[i].length + 1;
+    if (charNum > 1) pos += Math.min(charNum - 1, (lines[lineNum - 1] || '').length);
+    eng.setSelection(pos, pos);
+    const ceEl = document.getElementById('source-editor-ce');
+    if (ceEl) ceEl.scrollTop = Math.max(0, (lineNum - 1) * eng.lineHeight - ceEl.clientHeight / 2);
     state.currentLine = lineNum;
     state.currentChar = charNum || 1;
 }
