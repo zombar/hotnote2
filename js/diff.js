@@ -104,18 +104,18 @@ function renderDiff(oldText, newText, status, lang = '') {
         const lines = newText ? newText.split('\n') : [];
         if (lines.length && lines[lines.length - 1] === '') lines.pop();
         if (!lines.length) {
-            return '<div class="diff-untracked">New untracked file (empty)</div>';
+            return '<div class="diff-content"><div class="diff-untracked">New untracked file (empty)</div></div>';
         }
         let html = '<div class="diff-untracked">New untracked file</div>';
         for (let i = 0; i < lines.length; i++) {
             html += _diffLineHtml('diff-add', '+', null, i + 1, lines[i], lang);
         }
-        return html;
+        return `<div class="diff-content">${html}</div>`;
     }
 
     const diff = computeLineDiff(oldText, newText);
     if (!diff.some(d => d.type !== 'eq')) {
-        return '<div class="diff-clean">No changes vs HEAD</div>';
+        return '<div class="diff-content"><div class="diff-clean">No changes vs HEAD</div></div>';
     }
 
     // Assign per-line numbers
@@ -169,5 +169,5 @@ function renderDiff(oldText, newText, status, lang = '') {
         i = hunkEnd;
     }
 
-    return html;
+    return `<div class="diff-content">${html}</div>`;
 }

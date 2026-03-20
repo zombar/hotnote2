@@ -170,11 +170,14 @@ test.describe('diff view in split pane', () => {
         await expect(diffView).toBeVisible({ timeout: 5000 });
         await expect(diffView.locator('.diff-line')).not.toHaveCount(0);
 
+        // assert wrapper is present
+        await expect(diffView.locator('.diff-content')).toBeVisible();
+
         // The diff container must be horizontally scrollable (scrollWidth > clientWidth)
         const overflows = await diffView.evaluate(el => el.scrollWidth > el.clientWidth);
         expect(overflows).toBe(true);
 
-        // No diff-line code element should have wrapped (offsetHeight ≤ 2× a single line height)
+        // No diff-line code element should have wrapped (offsetHeight ≤ 1.5× a single line height)
         const wrapped = await diffView.evaluate(el => {
             const lines = el.querySelectorAll('.diff-line code');
             const singleLineH = parseFloat(getComputedStyle(el).lineHeight) || 20;

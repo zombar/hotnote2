@@ -1603,13 +1603,16 @@ html[data-theme="light"] #update-banner {
     background: var(--color-bg-primary);
 }
 
+.diff-content {
+    min-width: max-content;
+}
+
 /* Individual diff lines */
 .diff-line {
     display: flex;
     align-items: baseline;
     border-left: 2px solid transparent;
     padding: 0 0.75rem;
-    min-width: max-content;
 }
 .diff-ln {
     width: 3ch;
@@ -1633,7 +1636,6 @@ html[data-theme="light"] #update-banner {
     font-size: inherit;
     white-space: pre;
     flex: 1;
-    min-width: 0;
 }
 #diff-view .tok-keyword,  #diff-view-p2 .tok-keyword  { color: var(--tok-keyword); font-weight: 600; }
 #diff-view .tok-type,     #diff-view-p2 .tok-type     { color: var(--tok-type); }
