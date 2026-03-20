@@ -176,9 +176,26 @@ test.describe('file watcher', () => {
         await openMockFolder(page, { 'notes.md': '# Hello' });
         await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'notes.md' }).click();
         await expect(page.locator('#source-editor')).not.toHaveValue('');
-        // Advance past the 3s watcher interval; getFile() returns a newer lastModified → toast
+        // Advance clock slightly, then simulate an external file change, then advance past watcher interval
+        await page.clock.fastForward(100);
+        await page.evaluate(() => window.__mockFS.touchFile('notes.md'));
         await page.clock.fastForward(3001);
         await expect(page.locator('#toast-container .toast')).toBeVisible({ timeout: 5000 });
         await expect(page.locator('#toast-container .toast')).toContainText('Reloaded: notes.md');
+    });
+
+    test('file watcher does not show toast after saving', async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.clock.install();
+        await page.goto('/');
+        await openMockFolder(page, { 'notes.md': '# Hello' });
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'notes.md' }).click();
+        await expect(page.locator('#source-editor')).not.toHaveValue('');
+        // Edit and save
+        await page.locator('#source-editor').fill('# Changed');
+        await page.locator('#save-btn').click();
+        // Advance past watcher interval — should NOT show a toast
+        await page.clock.fastForward(3001);
+        await expect(page.locator('#toast-container .toast')).not.toBeVisible();
     });
 });
