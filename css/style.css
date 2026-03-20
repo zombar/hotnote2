@@ -1596,7 +1596,7 @@ html[data-theme="light"] #update-banner {
 /* Diff view container */
 #diff-view, #diff-view-p2 {
     flex: 1;
-    overflow-y: auto;
+    overflow: auto;
     font-family: var(--font-mono);
     font-size: 0.8rem;
     line-height: 1.5;
@@ -1630,8 +1630,7 @@ html[data-theme="light"] #update-banner {
 .diff-line code {
     font-family: inherit;
     font-size: inherit;
-    white-space: pre-wrap;
-    word-break: break-word;
+    white-space: pre;
     flex: 1;
     min-width: 0;
 }
