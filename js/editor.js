@@ -1,5 +1,7 @@
 'use strict';
 
+const APP_VERSION = '0.9.1';
+
 // =========================================================================
 // File Opening & Editor
 // =========================================================================
@@ -547,7 +549,8 @@ async function renderWelcomeScreen() {
             <div class="cl-body" id="cl-body-content">
                 <span class="cl-loading">Loading\u2026</span>
             </div>
-        </details>`;
+        </details>
+        <div class="welcome-footer">v${APP_VERSION} &nbsp;&middot;&nbsp; &copy; 2026 FORGE3D CYF</div>`;
 
     pane1El.appendChild(el);
 

@@ -1506,6 +1506,15 @@ html[data-theme="light"] #update-banner {
 }
 .cl-body li { margin: 0.15rem 0; }
 
+.welcome-footer {
+    margin-top: auto;
+    padding: 1rem 0 0;
+    font-size: 0.75rem;
+    color: var(--color-text-tertiary);
+    text-align: center;
+    letter-spacing: 0.03em;
+}
+
 /* =========================================================================
    Toast Notifications
    ========================================================================= */
