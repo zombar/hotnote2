@@ -96,6 +96,10 @@ git checkout main && git pull origin main
 git checkout -b feature/my-feature
 ```
 
+## Release Checklist
+
+When adding a CHANGELOG.md entry with a new version, also update `APP_VERSION` in `js/editor.js` to match.
+
 ## Other Make Targets
 - `make lint` — ESLint on `js/` only (test files are excluded)
 - `make preview` — serve on port 8080 and open browser
