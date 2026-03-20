@@ -11,8 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update checker
     initUpdateChecker();
-    document.getElementById('update-banner-reload')?.addEventListener('click', () => {
+    document.getElementById('update-banner-reload')?.addEventListener('click', async () => {
         localStorage.removeItem(UPDATE_CHECK_KEY);
+        try {
+            if ('caches' in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+            }
+        } catch (_) { /* ignore */ }
         window.location.reload();
     });
     document.getElementById('update-banner-dismiss')?.addEventListener('click', async () => {
