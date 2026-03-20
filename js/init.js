@@ -90,6 +90,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('back-btn')?.addEventListener('click', () => navigateHistory(-1));
     document.getElementById('forward-btn')?.addEventListener('click', () => navigateHistory(1));
     document.getElementById('split-pane-btn')?.addEventListener('click', toggleSplitPane);
+    document.getElementById('help-btn')?.addEventListener('click', () => {
+        if (state.helpMode) closeHelpPane();
+        else openHelpPane();
+    });
 
     // Search
     function _getSearchParams() {
@@ -148,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSourceHighlight('pane1');
 
         // Same-file sync: if pane2 has the same file open, sync its CE engine content
-        if (state.splitMode && state._panesHaveSameFile) {
+        if (state.splitMode && state._panesHaveSameFile && !state.helpMode) {
             const textarea2 = document.getElementById('source-editor-p2');
             if (textarea2) textarea2.value = sourceEditor.value;
             window.sourceEditors.pane2?.setValue(sourceEditor.value, { silent: true });
@@ -164,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSourceHighlight('pane2');
 
         // Same-file sync: if pane1 has the same file open, sync its CE engine content
-        if (state.splitMode && state._panesHaveSameFile) {
+        if (state.splitMode && state._panesHaveSameFile && !state.helpMode) {
             const textarea1 = document.getElementById('source-editor');
             if (textarea1) textarea1.value = sourceEditor2.value;
             window.sourceEditors.pane1?.setValue(sourceEditor2.value, { silent: true });

@@ -872,6 +872,20 @@ class SourceEditor {
             case 'c':
                 if (ctrl) { e.preventDefault(); this._copy(); }
                 break;
+            case 'x':
+                if (ctrl) {
+                    e.preventDefault();
+                    const hasAnySelection = this._cursors.some(c => this._hasSel(c));
+                    if (hasAnySelection) {
+                        this._cut(); this._render(); this._syncMirror(); this._scrollToCursor();
+                    } else {
+                        // Cut line: copy then delete
+                        const lines = [...new Set(this._cursors.map(c => c.line))].sort((a, b) => a - b);
+                        navigator.clipboard.writeText(lines.map(l => this._lines[l]).join('\n')).catch(() => {});
+                        this._deleteLine(); this._render(); this._syncMirror(); this._scrollToCursor();
+                    }
+                }
+                break;
             case 'Escape':
                 if (this._cursors.length > 1) {
                     e.preventDefault();

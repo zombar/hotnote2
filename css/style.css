@@ -627,6 +627,12 @@ main {
     box-shadow: var(--shadow-sm), var(--highlight-top), inset 0 -2px 0 var(--color-text-primary);
 }
 
+/* Help panel */
+.help-toolbar-spacer { flex: 1; }
+#help-btn.active {
+    box-shadow: var(--shadow-sm), var(--highlight-top), inset 0 -2px 0 var(--color-text-primary);
+}
+
 #mode-toolbar, #mode-toolbar-p2 {
     display: flex;
     align-items: center;
