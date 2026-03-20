@@ -1,3 +1,8 @@
+## [0.9.3] — 2026-03-20
+
+### Fixed
+- **File watcher false reload after save**: saving a file no longer triggers a "Reloaded" toast; `saveFile` now updates `lastModifiedTime` from the written file so the watcher ignores the app's own saves while still detecting genuine external changes
+
 ## [0.9.2] — 2026-03-20
 
 ### Fixed

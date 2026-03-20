@@ -80,6 +80,8 @@ async function saveFile(silent = false, paneId = null) {
     const textarea = getPaneEl('source-editor', pid);
     try {
         await writeFile(ps.currentFileHandle, textarea ? textarea.value : '');
+        const savedFile = await ps.currentFileHandle.getFile();
+        ps.lastModifiedTime = savedFile.lastModified;
         ps.isDirty = false;
         if (pid === 'pane1') {
             updateTitle();

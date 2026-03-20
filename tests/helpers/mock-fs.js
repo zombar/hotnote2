@@ -8,6 +8,7 @@
     let _tree = {};
     let _rootName = 'my-notes';
     const _written = new Map(); // relPath → content string
+    const _lastModified = new Map(); // relPath → timestamp
 
     function makeFileHandle(name, content, relPath) {
         return {
@@ -16,10 +17,11 @@
             async getFile() {
                 const c = _written.has(relPath) ? _written.get(relPath) : (content || '');
                 const bytes = new TextEncoder().encode(c);
+                if (!_lastModified.has(relPath)) _lastModified.set(relPath, Date.now());
                 return {
                     name,
                     size: bytes.byteLength,
-                    lastModified: Date.now(),
+                    lastModified: _lastModified.get(relPath),
                     async text() { return c; },
                 };
             },
@@ -27,7 +29,10 @@
                 const chunks = [];
                 return {
                     async write(d) { chunks.push(String(d)); },
-                    async close() { _written.set(relPath, chunks.join('')); },
+                    async close() {
+                        _written.set(relPath, chunks.join(''));
+                        _lastModified.set(relPath, Date.now());
+                    },
                 };
             },
             async isSameEntry(other) {
@@ -109,6 +114,10 @@
             _rootName = rootName || 'my-notes';
             this._rootName = _rootName;
             _written.clear();
+            _lastModified.clear();
+        },
+        touchFile(relPath) {
+            _lastModified.set(relPath, Date.now());
         },
         get written() {
             const o = {};
