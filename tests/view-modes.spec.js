@@ -462,21 +462,21 @@ test.describe('syntax highlighting', () => {
         await page.goto('/');
     });
 
-    test('JS file shows source mode with syntax highlight backdrop', async ({ page }) => {
+    test('JS file shows source mode with syntax highlight in CE editor', async ({ page }) => {
         await openMockFolder(page, { 'app.js': SAMPLE_JS });
         await openFile(page, 'app.js');
         // Source editor should be visible
         await expect(page.locator('#source-editor-wrap')).toBeVisible();
-        // Highlight backdrop should be populated
-        await expect(page.locator('#source-highlight-code')).not.toBeEmpty();
+        // CE editor should have rendered lines
+        await expect(page.locator('#source-editor-ce .ce-line').first()).toBeVisible();
     });
 
     test('highlight code contains syntax-colored spans for JS', async ({ page }) => {
         await openMockFolder(page, { 'app.js': SAMPLE_JS });
         await openFile(page, 'app.js');
-        // Verify backdrop has content (any span or text with keyword)
-        const code = await page.locator('#source-highlight-code').innerHTML();
-        expect(code.length).toBeGreaterThan(0);
+        // Verify CE editor has content with syntax spans
+        const html = await page.locator('#source-editor-ce').innerHTML();
+        expect(html.length).toBeGreaterThan(0);
     });
 
     test('plain text file has highlight backdrop populated', async ({ page }) => {

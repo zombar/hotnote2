@@ -96,6 +96,12 @@ git checkout main && git pull origin main
 git checkout -b feature/my-feature
 ```
 
+## Help Panel
+
+The help content lives in `js/help.js` — two const strings: `HELP_MARKDOWN_GUIDE` and `HELP_SHORTCUTS`.
+
+**Whenever you add, change, or remove a keyboard shortcut in `js/source-editor.js`, also update `HELP_SHORTCUTS` in `js/help.js` to match.**
+
 ## Release Checklist
 
 When adding a CHANGELOG.md entry with a new version, also update `APP_VERSION` in `js/editor.js` to match.

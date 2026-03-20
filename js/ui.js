@@ -96,7 +96,7 @@ function startFileWatcher() {
         for (const paneId of ['pane1', 'pane2']) {
             const ps = getPaneState(paneId);
             if (!ps.currentFileHandle || ps.isDirty) continue;
-            if (paneId === 'pane2' && !state.splitMode) continue;
+            if (paneId === 'pane2' && (!state.splitMode || state.helpMode)) continue;
             try {
                 const file = await ps.currentFileHandle.getFile();
                 if (ps.lastModifiedTime !== null && file.lastModified !== ps.lastModifiedTime) {
@@ -104,6 +104,7 @@ function startFileWatcher() {
                     const content = await file.text();
                     const textarea = getPaneEl('source-editor', paneId);
                     if (textarea) textarea.value = content;
+                    window.sourceEditors?.[paneId === 'pane2' ? 'pane2' : 'pane1']?.setValue(content, { silent: true });
                     switchToMode(ps.editorMode, paneId, content);
                     showToast(`Reloaded: ${ps.currentFilename}`);
                     if (state._panesHaveSameFile) break;

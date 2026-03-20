@@ -270,9 +270,11 @@ function renderEditor(content, filename, paneId = 'pane1') {
     const toolbar = getPaneEl('mode-toolbar', paneId);
     if (toolbar) toolbar.style.display = 'flex';
 
-    // Set textarea content
+    // Set textarea (mirror) content and sync CE engine
     const textarea = getPaneEl('source-editor', paneId);
     if (textarea) textarea.value = content;
+    const _ceKey = paneId === 'pane2' ? 'pane2' : 'pane1';
+    window.sourceEditors?.[_ceKey]?.setValue(content, { silent: true });
 
     updateModeToolbar(paneId);
     switchToMode(ps.editorMode, paneId, content);
@@ -501,6 +503,7 @@ function clearEditor() {
 
     if (wrap) wrap.style.display = 'none';
     if (textarea) textarea.value = '';
+    window.sourceEditors?.pane1?.setValue('', { silent: true });
     if (wysiwyg) wysiwyg.style.display = 'none';
     if (datasheet) datasheet.style.display = 'none';
     if (treeview) treeview.style.display = 'none';

@@ -38,28 +38,15 @@ function animateAutosaveLabel() {
     }, 1500);
 }
 
-function updateSourceHighlight(paneId = 'pane1') {
-    const ps = getPaneState(paneId);
-    const codeEl = getPaneEl('source-highlight-code', paneId);
-    if (!codeEl) return;
-    const textarea = getPaneEl('source-editor', paneId);
-    if (!textarea) return;
-    const content = textarea.value;
-    const lang = getExtension(ps.currentFilename);
-
-    // Trailing newline prevents last-line clipping
-    codeEl.innerHTML = highlightCode(content + '\n', lang);
-
-    // Update line numbers
-    const lineNumEl = getPaneEl('line-numbers', paneId);
-    if (lineNumEl) {
-        const lineCount = (content.match(/\n/g) || []).length + 1;
-        lineNumEl.textContent = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
-    }
+function updateSourceHighlight(_paneId = 'pane1') {
+    // No-op: syntax highlighting and line numbers are handled by the CE engine
 }
 
 function _scrollElForMode(mode, paneId = 'pane1') {
-    if (mode === 'source') return getPaneEl('source-editor', paneId);
+    if (mode === 'source') {
+        const sfx = paneId === 'pane2' ? '-p2' : '';
+        return document.getElementById(`source-editor-ce${sfx}`);
+    }
     if (mode === 'wysiwyg') return getPaneEl('wysiwyg', paneId);
     if (mode === 'treeview') return getPaneEl('s3-treeview', paneId);
     if (mode === 'datasheet') return getPaneEl('s3-datasheet', paneId);

@@ -7,6 +7,7 @@
 let _splitResizeInit = false;
 
 function toggleSplitPane() {
+    if (state.helpMode) { closeHelpPane(); return; }
     const btn = document.getElementById('split-pane-btn');
     if (state.splitMode) {
         // Close split pane

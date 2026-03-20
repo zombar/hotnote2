@@ -87,6 +87,8 @@ const state = {
     gitFilterActive: false,
     // Split pane state
     splitMode: false,
+    helpMode: false,
+    _helpModeWasSplit: false,
     _panesHaveSameFile: false,
     activePaneId: 'pane1',
     // Pane 2 state (pane 1 uses the flat state fields above)

@@ -26,7 +26,7 @@ test.describe('source editing', () => {
     test('typing marks file as dirty (• prefix in title)', async ({ page }) => {
         await openMockFolder(page, { 'notes.md': '# Hello' });
         await openFile(page, 'notes.md');
-        await page.locator('#source-editor').click();
+        await page.locator('#source-editor-ce').click();
         await page.keyboard.type(' world');
         await expect(page.locator('#source-editor')).toHaveValue(/# Hello world/);
         const title = await page.title();
@@ -36,7 +36,7 @@ test.describe('source editing', () => {
     test('save button is enabled when file is dirty', async ({ page }) => {
         await openMockFolder(page, { 'notes.md': '# Hello' });
         await openFile(page, 'notes.md');
-        await page.locator('#source-editor').click();
+        await page.locator('#source-editor-ce').click();
         await page.keyboard.type('x');
         await expect(page.locator('#save-btn')).toBeEnabled();
     });
@@ -44,9 +44,8 @@ test.describe('source editing', () => {
     test('editing updates the source-editor value', async ({ page }) => {
         await openMockFolder(page, { 'notes.md': 'original' });
         await openFile(page, 'notes.md');
-        const editor = page.locator('#source-editor');
-        await editor.fill('replaced content');
-        await expect(editor).toHaveValue('replaced content');
+        await page.evaluate(([p, v]) => window.setEditorValue(p, v), ['pane1', 'replaced content']);
+        await expect(page.locator('#source-editor')).toHaveValue('replaced content');
     });
 });
 
@@ -61,8 +60,7 @@ test.describe('manual save', () => {
     test('clicking save button writes content to mock FS', async ({ page }) => {
         await openMockFolder(page, { 'notes.md': '# Hello' });
         await openFile(page, 'notes.md');
-        const editor = page.locator('#source-editor');
-        await editor.click();
+        await page.locator('#source-editor-ce').click();
         await page.keyboard.type(' world');
         await page.locator('#save-btn').click();
         const written = await page.evaluate(() => window.__mockFS.written);
@@ -72,7 +70,7 @@ test.describe('manual save', () => {
     test('Ctrl+S saves and removes dirty indicator', async ({ page }) => {
         await openMockFolder(page, { 'notes.md': '# Hello' });
         await openFile(page, 'notes.md');
-        await page.locator('#source-editor').click();
+        await page.locator('#source-editor-ce').click();
         await page.keyboard.type(' edited');
         await page.keyboard.press('Control+s');
         // After save title should not start with •
@@ -110,7 +108,7 @@ test.describe('autosave', () => {
         const checked = await page.locator('#autosave-checkbox').isChecked();
         if (!checked) await page.locator('#autosave-checkbox').click();
 
-        await page.locator('#source-editor').click();
+        await page.locator('#source-editor-ce').click();
         await page.keyboard.type(' updated');
 
         // Advance clock by 2.5s to trigger autosave
@@ -129,7 +127,7 @@ test.describe('autosave', () => {
         const checked = await page.locator('#autosave-checkbox').isChecked();
         if (!checked) await page.locator('#autosave-checkbox').click();
 
-        await page.locator('#source-editor').fill('# Hello updated');
+        await page.evaluate(([p, v]) => window.setEditorValue(p, v), ['pane1', '# Hello updated']);
 
         // Advance clock past the 2s autosave debounce
         await page.clock.fastForward(2500);
@@ -149,7 +147,7 @@ test.describe('discard changes', () => {
     test('accepting discard opens the new file', async ({ page }) => {
         await openMockFolder(page, { 'a.md': '# A', 'b.md': '# B' });
         await openFile(page, 'a.md');
-        await page.locator('#source-editor').fill('# A modified');
+        await page.evaluate(([p, v]) => window.setEditorValue(p, v), ['pane1', '# A modified']);
         page.once('dialog', d => d.accept());
         await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'b.md' }).click();
         await expect(page.locator('#source-editor')).toHaveValue(/# B/, { timeout: 5000 });
@@ -158,7 +156,7 @@ test.describe('discard changes', () => {
     test('dismissing discard stays on current file with edits', async ({ page }) => {
         await openMockFolder(page, { 'a.md': '# A', 'b.md': '# B' });
         await openFile(page, 'a.md');
-        await page.locator('#source-editor').fill('# A modified');
+        await page.evaluate(([p, v]) => window.setEditorValue(p, v), ['pane1', '# A modified']);
         page.once('dialog', d => d.dismiss());
         await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'b.md' }).click();
         await expect(page.locator('#source-editor')).toHaveValue('# A modified');
@@ -192,7 +190,7 @@ test.describe('file watcher', () => {
         await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'notes.md' }).click();
         await expect(page.locator('#source-editor')).not.toHaveValue('');
         // Edit and save
-        await page.locator('#source-editor').fill('# Changed');
+        await page.evaluate(([p, v]) => window.setEditorValue(p, v), ['pane1', '# Changed']);
         await page.locator('#save-btn').click();
         // Advance past watcher interval — should NOT show a toast
         await page.clock.fastForward(3001);
