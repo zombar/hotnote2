@@ -80,12 +80,13 @@ async function listDirectory(dirHandle) {
     return [...dirs, ...files];
 }
 
-async function getAllFiles(dirHandle, basePath, results = []) {
+async function getAllFiles(dirHandle, basePath, results = [], limit = MAX_SEARCH_FILES) {
     for await (const [name, handle] of dirHandle.entries()) {
+        if (results.length >= limit) return results;
         if (name.startsWith('.')) continue;
         const relPath = basePath ? basePath + '/' + name : name;
         if (handle.kind === 'directory') {
-            await getAllFiles(handle, relPath, results);
+            await getAllFiles(handle, relPath, results, limit);
         } else {
             let size = 0;
             try { size = (await handle.getFile()).size; } catch (_e) { /* ignore */ }
