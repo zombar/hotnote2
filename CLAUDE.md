@@ -96,6 +96,12 @@ git checkout main && git pull origin main
 git checkout -b feature/my-feature
 ```
 
+Before creating a branch or PR, check whether one already exists for the current work:
+```
+gh pr list --head $(git branch --show-current)
+```
+If a PR is already open or merged, do not create a duplicate. If the branch has already been merged into `main`, check out and pull `main` first, then create a new branch for any follow-up work.
+
 ## Help Panel
 
 The help content lives in `js/help.js` — two const strings: `HELP_MARKDOWN_GUIDE` and `HELP_SHORTCUTS`.
