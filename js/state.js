@@ -41,7 +41,7 @@ const MAX_OPENABLE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 const MAX_GIT_FILES           = 5000;  // skip git detection if index has more entries
 const GIT_REFRESH_DEBOUNCE_MS = 10000; // min ms between auto git refreshes
-const GIT_BATCH_SIZE          = 20;    // concurrent file reads in detectChangedFiles
+const GIT_BATCH_SIZE          = 4;     // concurrent file reads in detectChangedFiles
 const MAX_SEARCH_FILES        = 10000; // max files getAllFiles returns during search
 const SEARCH_CONCURRENCY      = 10;    // concurrent file reads in content search
 const FILE_HISTORY_MAX        = 100;   // max entries in fileHistory
