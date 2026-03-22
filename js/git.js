@@ -382,14 +382,18 @@ async function detectChangedFiles(rootHandle) {
                     dir = await dir.getDirectoryHandle(parts[i]);
                 }
                 const file = await (await dir.getFileHandle(parts[parts.length - 1])).getFile();
-                if (file.size > 10 * 1024 * 1024) continue; // skip large files
-                if (state.gitMtimeCache.get(relPath) === file.lastModified) continue; // fast-path
-                const sha = await computeFileSha1(await file.text());
-                state.gitMtimeCache.set(relPath, file.lastModified);
-                if (sha !== indexSha) changedPaths.add(relPath);
+                if (file.size <= 10 * 1024 * 1024 &&
+                    state.gitMtimeCache.get(relPath) !== file.lastModified) {
+                    const sha = await computeFileSha1(await file.text());
+                    state.gitMtimeCache.set(relPath, file.lastModified);
+                    if (sha !== indexSha) changedPaths.add(relPath);
+                }
             } catch (_) {
                 changedPaths.add(relPath); // deleted file = changed
             }
+            // Yield to the event loop after each file so user interactions
+            // (e.g. opening a file) are not queued behind git API calls
+            await new Promise(r => setTimeout(r, 0));
         }
     }
 
