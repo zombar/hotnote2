@@ -113,6 +113,12 @@
             return protect(`<code data-md="${escapeHtml(match)}">${code}</code>`);
         });
 
+        // Wikilinks: [[target]] or [[target|display text]]
+        result = result.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, target, display) => {
+            const dispText = display !== undefined ? display.trim() : target.trim();
+            return protect(`<a class="wikilink" data-wikilink="${target.trim()}" href="#" data-md="${escapeHtml(match)}">${dispText}</a>`);
+        });
+
         // Images: ![alt](url)
         result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
             const safeUrl = sanitizeUrl(url);
@@ -417,7 +423,7 @@
             if (line.match(/^[*+-]\s/)) break; // List
             if (line.match(/^\d+\.\s/)) break; // Ordered list
             if (line.startsWith('>')) break; // Blockquote
-            if (line.includes('|')) break; // Table
+            if (line.startsWith('|') || (line.includes('|') && (line.match(/\|/g) || []).length >= 2)) break; // Table
             if (/^(\*{3,}|-{3,}|_{3,})$/.test(line)) break; // HR
 
             paraLines.push(line);

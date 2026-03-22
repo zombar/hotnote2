@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.9.6';
+const APP_VERSION = '0.9.7';
 
 // =========================================================================
 // File Opening & Editor
@@ -325,6 +325,7 @@ function updateModeToolbar(paneId = 'pane1') {
         ${hasDatasheet ? `<button class="btn btn-sm${ps.editorMode === 'datasheet' ? ' active' : ''}" id="mode-datasheet${sfx}">Table</button>` : ''}
         ${hasTree ? `<button class="btn btn-sm${ps.editorMode === 'treeview' ? ' active' : ''}" id="mode-treeview${sfx}">Tree</button>` : ''}
         ${showDiff ? `<button class="btn btn-sm${ps.editorMode === 'diff' ? ' active' : ''}" id="mode-diff${sfx}">Diff</button>` : ''}
+        ${isMd ? `<button class="btn btn-sm${ps.tocVisible ? ' active' : ''}" id="toc-btn${sfx}" title="Toggle outline">TOC</button>` : ''}
         <span id="filename-display${sfx}" class="filename-display">${escapeHtml(ps.currentFilename)}</span>
         <label class="wrap-toggle-label" title="Toggle word wrap">
             <input type="checkbox" id="wrap-toggle${sfx}" class="pill-toggle"${ps.wordWrap ? ' checked' : ''}>
@@ -337,6 +338,7 @@ function updateModeToolbar(paneId = 'pane1') {
     document.getElementById(`mode-datasheet${sfx}`)?.addEventListener('click', () => switchToMode('datasheet', paneId));
     document.getElementById(`mode-treeview${sfx}`)?.addEventListener('click', () => switchToMode('treeview', paneId));
     document.getElementById(`mode-diff${sfx}`)?.addEventListener('click', () => switchToMode('diff', paneId));
+    document.getElementById(`toc-btn${sfx}`)?.addEventListener('click', () => toggleTOC(paneId));
     document.getElementById(`wrap-toggle${sfx}`)?.addEventListener('change', (e) => {
         ps.wordWrap = e.target.checked;
         applyWordWrap(paneId);
@@ -486,12 +488,113 @@ function switchToMode(mode, paneId = 'pane1', content) {
     const newEl = _scrollElForMode(mode, paneId);
     if (newEl) newEl.scrollTop = ps.scrollPositions[mode] || 0;
 
-    // Update toolbar buttons
+    // Update toolbar mode buttons (skip the TOC button — it manages its own state)
     const toolbarId = paneId === 'pane1' ? 'mode-toolbar' : 'mode-toolbar-p2';
-    document.querySelectorAll(`#${toolbarId} .btn`).forEach(btn => {
+    document.querySelectorAll(`#${toolbarId} .btn[id^="mode-"]`).forEach(btn => {
         const btnMode = btn.id?.replace('mode-', '').replace('-p2', '');
         btn.classList.toggle('active', btnMode === mode);
     });
+
+    renderTOC(paneId);
+}
+
+// =========================================================================
+// TOC (Table of Contents)
+// =========================================================================
+
+function renderTOC(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    const sfx = paneId === 'pane2' ? '-p2' : '';
+    const tocPanel = document.getElementById(`toc-panel${sfx}`);
+    const paneEl = document.getElementById(paneId);
+    if (!tocPanel || !paneEl) return;
+
+    const show = ps.tocVisible && ps.editorMode === 'wysiwyg';
+    paneEl.classList.toggle('toc-open', show);
+
+    if (!show) {
+        tocPanel.style.display = 'none';
+        return;
+    }
+
+    const wysiwyg = getPaneEl('wysiwyg', paneId);
+    const headers = wysiwyg ? wysiwyg.querySelectorAll('h1,h2,h3,h4,h5,h6') : [];
+
+    if (headers.length === 0) {
+        tocPanel.style.display = 'none';
+        paneEl.classList.remove('toc-open');
+        return;
+    }
+
+    // Assign IDs to headings for anchor scrolling
+    let idCounter = 0;
+    headers.forEach(h => {
+        if (!h.id) {
+            const slug = h.textContent.trim().toLowerCase()
+                .replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-') || `h${idCounter}`;
+            h.id = `hn-${slug}-${idCounter}`;
+        }
+        idCounter++;
+    });
+
+    const levels = Array.from(headers).map(h => parseInt(h.tagName[1]));
+    const minLevel = Math.min(...levels);
+
+    const items = Array.from(headers).map(h => {
+        const indent = parseInt(h.tagName[1]) - minLevel;
+        return `<a class="toc-item toc-level-${indent}" data-heading-id="${escapeHtml(h.id)}" href="#">${escapeHtml(h.textContent.trim())}</a>`;
+    }).join('');
+
+    tocPanel.innerHTML = `<div class="toc-header">Outline</div><div class="toc-list">${items}</div>`;
+    tocPanel.style.display = 'flex';
+
+    tocPanel.querySelectorAll('.toc-item').forEach(item => {
+        item.addEventListener('click', e => {
+            e.preventDefault();
+            const heading = document.getElementById(item.dataset.headingId);
+            if (heading) heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+}
+
+function toggleTOC(paneId = 'pane1') {
+    const ps = getPaneState(paneId);
+    ps.tocVisible = !ps.tocVisible;
+    const sfx = paneId === 'pane2' ? '-p2' : '';
+    const tocBtn = document.getElementById(`toc-btn${sfx}`);
+    if (tocBtn) tocBtn.classList.toggle('active', ps.tocVisible);
+    if (ps.editorMode !== 'wysiwyg') {
+        switchToMode('wysiwyg', paneId);
+    } else {
+        renderTOC(paneId);
+    }
+}
+
+// =========================================================================
+// Wikilinks
+// =========================================================================
+
+async function openWikilink(target, paneId = 'pane1') {
+    if (!state.rootHandle) return;
+    const name = target.trim();
+    try {
+        const allFiles = await getAllFiles(state.rootHandle, '');
+        let match = allFiles.find(f => f.name === name || f.relPath === name);
+        if (!match && !name.includes('.')) {
+            match = allFiles.find(f => f.name === name + '.md' || f.relPath === name + '.md');
+        }
+        if (match) {
+            await openFile(match.handle, match.name, true, paneId);
+            const ps = getPaneState(paneId);
+            if (ps.editorMode !== 'wysiwyg' && getExtension(match.name) === 'md') {
+                switchToMode('wysiwyg', paneId);
+            }
+        } else {
+            showToast(`Note not found: ${name}`);
+        }
+    } catch (_e) {
+        showToast('Failed to open note');
+    }
 }
 
 function clearEditor() {
