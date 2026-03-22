@@ -89,7 +89,6 @@ const state = {
     searchQuery: '',
     // Editor display
     wordWrap: false,
-    tocVisible: false,
     // Git state
     gitAvailable: false,
     gitChangedPaths: new Set(),
@@ -125,7 +124,6 @@ const state = {
         autosaveEnabled: false,
         autosaveTimer: null,
         wordWrap: false,
-        tocVisible: false,
         currentRelativePath: null,
         currentLine: 1,
         currentChar: 1,

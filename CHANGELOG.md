@@ -3,7 +3,6 @@
 ### Added
 - **Wikilinks**: `[[note-name]]` or `[[note-name|display text]]` syntax in markdown files renders as a clickable link in Preview mode; clicking opens the target note (`.md` extension auto-appended if omitted); notes not found show a toast
 - **Scroll sync**: when split pane is open with the same file in source + preview, scrolling either panel proportionally scrolls the other
-- **Table of Contents (TOC)**: a **TOC** button in the mode toolbar for markdown files toggles an Outline panel overlaid on the right side of the preview; headings are listed with indentation by level and clicking scrolls smoothly to that heading; the panel auto-hides in non-preview modes
 
 ## [0.9.6] — 2026-03-22
 
