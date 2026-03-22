@@ -1,9 +1,4 @@
-# Hotnote
-
-[https://hotnote.io](https://hotnote.io)
-
-> [!NOTE]
-> The app was recently rewritten to be pure Javascript removing external dependancies. Some advanced editing features were temporarily removed as a result (until we reintegrate them as native implementations), previous implementation is archived [here](https://github.com/zombar/hotnote.io-old)
+# [hotnote.io](https://hotnote.io)
 
 Minimalist online code editor with local filesystem access.
 
