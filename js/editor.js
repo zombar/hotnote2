@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.9.4';
+const APP_VERSION = '0.9.5';
 
 // =========================================================================
 // File Opening & Editor
@@ -29,12 +29,20 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
                         ...(scrollEl ? { [ps.editorMode]: scrollEl.scrollTop } : {}),
                     },
                 };
-                ps.filePositionCache[current.relPath || current.name] = current.pos;
+                const _cacheKeyPos = current.relPath || current.name;
+                if (ps.filePositionCache.size >= FILE_POS_CACHE_MAX) {
+                    ps.filePositionCache.delete(ps.filePositionCache.keys().next().value);
+                }
+                ps.filePositionCache.set(_cacheKeyPos, current.pos);
             }
             ps.fileHistory = ps.fileHistory.slice(0, ps.fileHistoryIndex + 1);
             const relPath = paneId === 'pane1' ? state.currentRelativePath : ps.currentRelativePath;
             ps.fileHistory.push({ handle: fileHandle, name: filename, relPath });
             ps.fileHistoryIndex = ps.fileHistory.length - 1;
+            if (ps.fileHistory.length > FILE_HISTORY_MAX) {
+                ps.fileHistory.splice(0, ps.fileHistory.length - FILE_HISTORY_MAX);
+                ps.fileHistoryIndex = ps.fileHistory.length - 1;
+            }
         }
     }
 
@@ -57,7 +65,7 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
 
     // Restore cached positions if this file was visited before
     const _cacheKey = (paneId === 'pane1' ? state.currentRelativePath : ps.currentRelativePath) || filename;
-    const _cachedPos = pushHistory ? (ps.filePositionCache[_cacheKey] || null) : null;
+    const _cachedPos = pushHistory ? (ps.filePositionCache.get(_cacheKey) || null) : null;
     ps.scrollPositions = _cachedPos?.scrollPositions ? { ..._cachedPos.scrollPositions } : {};
 
     let content = '';
@@ -161,7 +169,11 @@ async function navigateHistory(delta) {
                 ...(scrollEl ? { [ps.editorMode]: scrollEl.scrollTop } : {}),
             },
         };
-        ps.filePositionCache[curEntry.relPath || curEntry.name] = curEntry.pos;
+        const _navCacheKey = curEntry.relPath || curEntry.name;
+        if (ps.filePositionCache.size >= FILE_POS_CACHE_MAX) {
+            ps.filePositionCache.delete(ps.filePositionCache.keys().next().value);
+        }
+        ps.filePositionCache.set(_navCacheKey, curEntry.pos);
     }
 
     ps.fileHistoryIndex = target;

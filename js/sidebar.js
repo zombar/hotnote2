@@ -1,5 +1,7 @@
 'use strict';
 
+let _searchAbortController = null;
+
 // =========================================================================
 // Open Folder
 // =========================================================================
@@ -56,7 +58,7 @@ async function renderSidebar() {
         entries = entries.filter(e => {
             const rp = baseDirRelPath ? baseDirRelPath + '/' + e.name : e.name;
             if (e.kind === 'directory') {
-                return [...state.gitChangedPaths].some(p => p.startsWith(rp + '/'));
+                return state.gitChangedDirs.has(rp);
             }
             return state.gitChangedPaths.has(rp);
         });
@@ -111,7 +113,7 @@ function renderFileEntry(entry, parentHandle, dirRelPath) {
     if (entry.kind === 'directory') {
         const folderRelPath = dirRelPath ? dirRelPath + '/' + entry.name : entry.name;
         const hasDirChange = state.gitAvailable &&
-            [...state.gitChangedPaths].some(p => p.startsWith(folderRelPath + '/'));
+            state.gitChangedDirs.has(folderRelPath);
         const gitDot = hasDirChange
             ? '<span class="git-dot" aria-label="modified"></span>'
             : '';
@@ -283,7 +285,7 @@ async function toggleFolder(li, handle, dirRelPath) {
         entries = entries.filter(e => {
             const rp = dirRelPath ? dirRelPath + '/' + e.name : e.name;
             if (e.kind === 'directory') {
-                return [...state.gitChangedPaths].some(p => p.startsWith(rp + '/'));
+                return state.gitChangedDirs.has(rp);
             }
             return state.gitChangedPaths.has(rp);
         });
@@ -564,6 +566,7 @@ function toggleSearch() {
 }
 
 function clearSearch() {
+    if (_searchAbortController) { _searchAbortController.abort(); _searchAbortController = null; }
     state.searchActive = false;
     state.searchQuery = '';
     document.getElementById('search-panel').classList.add('hidden');
@@ -575,6 +578,12 @@ function clearSearch() {
 }
 
 async function performSearch(query, includeContent, excludePatterns) {
+    // Cancel any previous in-flight search
+    if (_searchAbortController) { _searchAbortController.abort(); }
+    const controller = new AbortController();
+    _searchAbortController = controller;
+    const signal = controller.signal;
+
     state.searchQuery = query;
     if (!state.rootHandle || !query.trim()) {
         renderSidebar();
@@ -584,6 +593,7 @@ async function performSearch(query, includeContent, excludePatterns) {
     list.innerHTML = '<li class="search-status">Searching…</li>';
 
     let allFiles = await getAllFiles(state.rootHandle, '');
+    if (signal.aborted) return;
 
     // When the changes filter is active, restrict search to changed files only
     if (state.gitFilterActive && state.gitChangedPaths.size > 0) {
@@ -599,17 +609,32 @@ async function performSearch(query, includeContent, excludePatterns) {
     let results = nameMatches;
 
     if (includeContent) {
+        if (signal.aborted) return;
         const contentHits = new Set();
-        await Promise.all(allFiles.map(async (f) => {
-            if (isUnopenable(f) || f.size > MAX_OPENABLE_SIZE) return;
-            if (shouldExclude(f.relPath, f.name, excludePatterns)) return;
-            try {
-                const text = await (await f.handle.getFile()).text();
-                if (text.toLowerCase().includes(query.toLowerCase())) {
-                    contentHits.add(f.relPath);
-                }
-            } catch (_e) { /* ignore unreadable files */ }
-        }));
+        const candidateFiles = allFiles.filter(f =>
+            !isUnopenable(f) && f.size <= MAX_OPENABLE_SIZE && !shouldExclude(f.relPath, f.name, excludePatterns)
+        );
+        let fi = 0;
+
+        async function readOne() {
+            while (fi < candidateFiles.length) {
+                if (signal.aborted) return;
+                const f = candidateFiles[fi++];
+                try {
+                    const text = await (await f.handle.getFile()).text();
+                    if (signal.aborted) return;
+                    if (text.toLowerCase().includes(query.toLowerCase())) {
+                        contentHits.add(f.relPath);
+                    }
+                } catch (_e) { /* ignore unreadable files */ }
+            }
+        }
+
+        const workers = [];
+        for (let w = 0; w < SEARCH_CONCURRENCY; w++) workers.push(readOne());
+        await Promise.all(workers);
+        if (signal.aborted) return;
+
         const nameHitPaths = new Set(nameMatches.map(r => r.relPath));
         const contentOnly = allFiles.filter(f =>
             contentHits.has(f.relPath) && !nameHitPaths.has(f.relPath) && !isUnopenable(f)
@@ -618,6 +643,7 @@ async function performSearch(query, includeContent, excludePatterns) {
         results.sort((a, b) => a.relPath.localeCompare(b.relPath));
     }
 
+    if (signal.aborted) return;
     renderSearchResults(results);
 }
 
