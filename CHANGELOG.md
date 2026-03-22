@@ -1,3 +1,8 @@
+## [0.9.6] — 2026-03-22
+
+### Fixed
+- **File open freeze after folder load**: git status workers (introduced in 0.9.5) were firing up to 20 concurrent File System API calls, queuing behind user-initiated file opens. Reduced worker concurrency (`GIT_BATCH_SIZE` 20 → 4) and added a `setTimeout(0)` yield after each file so the event loop can process clicks between reads
+
 ## [0.9.5] — 2026-03-21
 
 ### Changed
