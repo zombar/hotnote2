@@ -366,27 +366,48 @@ async function detectChangedFiles(rootHandle) {
 
     const indexMap = await _readGitIndex(rootHandle);
     if (!indexMap) return null; // not a git repo or unreadable
+    if (indexMap.size > MAX_GIT_FILES) return null; // too large — skip
 
-    // Iterate index entries (tracked files only) — avoids scanning node_modules and other
-    // untracked directories which would be incorrectly flagged as "changed".
+    const entries = [...indexMap.entries()];
     const changedPaths = new Set();
-    await Promise.all([...indexMap.entries()].map(async ([relPath, indexSha]) => {
-        try {
-            const parts = relPath.split('/');
-            let dir = rootHandle;
-            for (let i = 0; i < parts.length - 1; i++) {
-                dir = await dir.getDirectoryHandle(parts[i]);
-            }
-            const file = await (await dir.getFileHandle(parts[parts.length - 1])).getFile();
-            if (file.size > 10 * 1024 * 1024) return; // skip large files
-            const sha = await computeFileSha1(await file.text());
-            if (sha !== indexSha) changedPaths.add(relPath);
-        } catch (_) {
-            changedPaths.add(relPath); // deleted file = changed
-        }
-    }));
+    let ei = 0;
 
+    async function processOne() {
+        while (ei < entries.length) {
+            const [relPath, indexSha] = entries[ei++];
+            try {
+                const parts = relPath.split('/');
+                let dir = rootHandle;
+                for (let i = 0; i < parts.length - 1; i++) {
+                    dir = await dir.getDirectoryHandle(parts[i]);
+                }
+                const file = await (await dir.getFileHandle(parts[parts.length - 1])).getFile();
+                if (file.size > 10 * 1024 * 1024) continue; // skip large files
+                if (state.gitMtimeCache.get(relPath) === file.lastModified) continue; // fast-path
+                const sha = await computeFileSha1(await file.text());
+                state.gitMtimeCache.set(relPath, file.lastModified);
+                if (sha !== indexSha) changedPaths.add(relPath);
+            } catch (_) {
+                changedPaths.add(relPath); // deleted file = changed
+            }
+        }
+    }
+
+    const workers = [];
+    for (let w = 0; w < GIT_BATCH_SIZE; w++) workers.push(processOne());
+    await Promise.all(workers);
     return changedPaths;
+}
+
+function _buildChangedDirs(changedPaths) {
+    const dirs = new Set();
+    for (const p of changedPaths) {
+        const parts = p.split('/');
+        for (let i = 1; i < parts.length; i++) {
+            dirs.add(parts.slice(0, i).join('/'));
+        }
+    }
+    return dirs;
 }
 
 async function readHeadBlob(rootHandle, relPath) {
@@ -447,12 +468,31 @@ async function readHeadBlob(rootHandle, relPath) {
     return new TextDecoder().decode(blobObj.raw);
 }
 
-async function refreshGitStatus() {
-    const changedPaths = await detectChangedFiles(state.rootHandle);
-    state.gitAvailable = changedPaths !== null;
-    state.gitChangedPaths = changedPaths ?? new Set();
+async function _refreshGitStatusImpl() {
+    const changed = await detectChangedFiles(state.rootHandle);
+    state.gitAvailable = changed !== null;
+    state.gitChangedPaths = changed || new Set();
+    state.gitChangedDirs = _buildChangedDirs(state.gitChangedPaths);
     updateGitFilterBar();
     _reAnnotateSidebarDots();
+}
+
+async function refreshGitStatus({ force = false } = {}) {
+    const now = performance.now();
+    if (!force && (now - state.gitLastRefreshed) < GIT_REFRESH_DEBOUNCE_MS) {
+        if (!state._gitRefreshTimer) {
+            const remaining = GIT_REFRESH_DEBOUNCE_MS - (now - state.gitLastRefreshed);
+            state._gitRefreshTimer = setTimeout(() => {
+                state._gitRefreshTimer = null;
+                state.gitLastRefreshed = performance.now();
+                _refreshGitStatusImpl();
+            }, remaining);
+        }
+        return;
+    }
+    state.gitLastRefreshed = now;
+    if (state._gitRefreshTimer) { clearTimeout(state._gitRefreshTimer); state._gitRefreshTimer = null; }
+    await _refreshGitStatusImpl();
 }
 
 function _reAnnotateSidebarDots() {
@@ -462,7 +502,7 @@ function _reAnnotateSidebarDots() {
     document.querySelectorAll('#file-list .file-entry').forEach(li => {
         if (!li._relPath) return;
         const hasChange = li._dirHandle
-            ? [...state.gitChangedPaths].some(p => p.startsWith(li._relPath + '/'))
+            ? state.gitChangedDirs.has(li._relPath)
             : state.gitChangedPaths.has(li._relPath);
         if (hasChange) {
             li.querySelector('.icon')?.insertAdjacentHTML(

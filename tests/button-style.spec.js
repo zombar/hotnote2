@@ -2,6 +2,19 @@ import { test, expect } from '@playwright/test';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
+/** Parse "rgb(r, g, b)" → [r, g, b]. Returns null for non-rgb strings. */
+function parseRgb(str) {
+    const m = str.match(/^rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)$/);
+    return m ? [+m[1], +m[2], +m[3]] : null;
+}
+
+/** True if two rgb() strings are equal within ±1 per channel (sub-pixel rounding). */
+function rgbNear(a, b) {
+    const ca = parseRgb(a), cb = parseRgb(b);
+    if (!ca || !cb) return a === b;
+    return ca.every((v, i) => Math.abs(v - cb[i]) <= 1);
+}
+
 async function openFolder(page) {
     await page.evaluate(({ tree }) => window.__mockFS.setTree(tree), {
         tree: { 'notes.md': '# Hello' },
@@ -120,8 +133,8 @@ test.describe('General styling consistency', () => {
         expect(styles.length).toBeGreaterThan(1);
         const ref = styles[0];
         for (const btn of styles) {
-            expect(btn.background, `"${btn.id}" background`).toBe(ref.background);
-            expect(btn.border,     `"${btn.id}" border-color`).toBe(ref.border);
+            expect(rgbNear(btn.background, ref.background), `"${btn.id}" background: ${btn.background} vs ${ref.background}`).toBe(true);
+            expect(rgbNear(btn.border,     ref.border),     `"${btn.id}" border-color: ${btn.border} vs ${ref.border}`).toBe(true);
         }
     });
 

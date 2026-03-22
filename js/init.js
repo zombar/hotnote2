@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Open folder button
     document.getElementById('open-folder')?.addEventListener('click', async () => {
         await openFolder();
-        await refreshGitStatus();
+        await refreshGitStatus({ force: true });
     });
 
     // Git changes filter checkbox
@@ -242,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const charNum = parseInt(banner?.dataset.char || '0', 10) || 0;
         dismissResumePrompt();
         await openFolder();
-        await refreshGitStatus();
+        await refreshGitStatus({ force: true });
         if (filePath && state.rootHandle) {
             await openFileByPath(state.rootHandle, filePath, lineNum, charNum);
         }

@@ -1,3 +1,11 @@
+## [0.9.5] — 2026-03-21
+
+### Changed
+- **Performance — large monorepos**: `detectChangedFiles` now skips git status entirely when a repo has >5 000 indexed files (returns unavailable) and uses a 20-worker batch pool with an mtime fast-path to avoid redundant SHA-1 hashing on unchanged files; `refreshGitStatus` is debounced to at most once per 10 s on post-save calls (open-folder calls always run immediately)
+- **Performance — O(1) git dot annotation**: pre-computed `gitChangedDirs` Set replaces O(n×m) `startsWith` scans in `_reAnnotateSidebarDots`, `renderSidebar`, `toggleFolder`, and `renderFileEntry`
+- **Performance — search**: `performSearch` now uses an `AbortController` to cancel stale in-flight searches when a new query is typed; content reads use a 10-worker concurrency pool instead of an unbounded `Promise.all`; `getAllFiles` accepts a `limit` (default 10 000 files) to cap memory use on huge trees
+- **Performance — history/cache caps**: `fileHistory` is capped at 100 entries; `filePositionCache` (converted to `Map`) evicts the oldest entry when it reaches 200
+
 ## [0.9.4] — 2026-03-20
 
 ### Added
