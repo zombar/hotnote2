@@ -60,24 +60,58 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSidebar();
     });
 
-    // Wysiwyg link clicks — open in new tab so we don't navigate away
-    document.getElementById('wysiwyg')?.addEventListener('click', (e) => {
+    // Wysiwyg link clicks — wikilinks open in-app, external links open in new tab
+    function handleWysiwygClick(e, paneId) {
         const link = e.target.closest('a[href]');
         if (!link) return;
         e.preventDefault();
+        if (link.classList.contains('wikilink')) {
+            openWikilink(link.dataset.wikilink, paneId);
+            return;
+        }
         const href = link.getAttribute('href');
         if (href && href !== '#') {
             window.open(href, '_blank', 'noopener,noreferrer');
         }
+    }
+    document.getElementById('wysiwyg')?.addEventListener('click', e => handleWysiwygClick(e, 'pane1'));
+    document.getElementById('wysiwyg-p2')?.addEventListener('click', e => handleWysiwygClick(e, 'pane2'));
+
+    // Scroll sync: source ↔ wysiwyg when split pane has the same file
+    let _scrollSyncing = false;
+    function _syncScroll(fromEl, toEl) {
+        if (_scrollSyncing) return;
+        _scrollSyncing = true;
+        requestAnimationFrame(() => {
+            const maxFrom = fromEl.scrollHeight - fromEl.clientHeight;
+            if (maxFrom > 0) {
+                const ratio = fromEl.scrollTop / maxFrom;
+                const maxTo = toEl.scrollHeight - toEl.clientHeight;
+                toEl.scrollTop = ratio * maxTo;
+            }
+            _scrollSyncing = false;
+        });
+    }
+    function _shouldSyncScroll(fromPane, fromMode, toPane, toMode) {
+        return state.splitMode && state._panesHaveSameFile &&
+            getPaneState(fromPane).editorMode === fromMode &&
+            getPaneState(toPane).editorMode === toMode;
+    }
+    document.getElementById('source-editor-ce')?.addEventListener('scroll', () => {
+        if (!_shouldSyncScroll('pane1', 'source', 'pane2', 'wysiwyg')) return;
+        _syncScroll(document.getElementById('source-editor-ce'), document.getElementById('wysiwyg-p2'));
     });
-    document.getElementById('wysiwyg-p2')?.addEventListener('click', (e) => {
-        const link = e.target.closest('a[href]');
-        if (!link) return;
-        e.preventDefault();
-        const href = link.getAttribute('href');
-        if (href && href !== '#') {
-            window.open(href, '_blank', 'noopener,noreferrer');
-        }
+    document.getElementById('wysiwyg-p2')?.addEventListener('scroll', () => {
+        if (!_shouldSyncScroll('pane2', 'wysiwyg', 'pane1', 'source')) return;
+        _syncScroll(document.getElementById('wysiwyg-p2'), document.getElementById('source-editor-ce'));
+    });
+    document.getElementById('wysiwyg')?.addEventListener('scroll', () => {
+        if (!_shouldSyncScroll('pane1', 'wysiwyg', 'pane2', 'source')) return;
+        _syncScroll(document.getElementById('wysiwyg'), document.getElementById('source-editor-ce-p2'));
+    });
+    document.getElementById('source-editor-ce-p2')?.addEventListener('scroll', () => {
+        if (!_shouldSyncScroll('pane2', 'source', 'pane1', 'wysiwyg')) return;
+        _syncScroll(document.getElementById('source-editor-ce-p2'), document.getElementById('wysiwyg'));
     });
 
     // Save button

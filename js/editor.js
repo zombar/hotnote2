@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.9.6';
+const APP_VERSION = '0.9.7';
 
 // =========================================================================
 // File Opening & Editor
@@ -492,6 +492,33 @@ function switchToMode(mode, paneId = 'pane1', content) {
         const btnMode = btn.id?.replace('mode-', '').replace('-p2', '');
         btn.classList.toggle('active', btnMode === mode);
     });
+}
+
+// =========================================================================
+// Wikilinks
+// =========================================================================
+
+async function openWikilink(target, paneId = 'pane1') {
+    if (!state.rootHandle) return;
+    const name = target.trim();
+    try {
+        const allFiles = await getAllFiles(state.rootHandle, '');
+        let match = allFiles.find(f => f.name === name || f.relPath === name);
+        if (!match && !name.includes('.')) {
+            match = allFiles.find(f => f.name === name + '.md' || f.relPath === name + '.md');
+        }
+        if (match) {
+            await openFile(match.handle, match.name, true, paneId);
+            const ps = getPaneState(paneId);
+            if (ps.editorMode !== 'wysiwyg' && getExtension(match.name) === 'md') {
+                switchToMode('wysiwyg', paneId);
+            }
+        } else {
+            showToast(`Note not found: ${name}`);
+        }
+    } catch (_e) {
+        showToast('Failed to open note');
+    }
 }
 
 function clearEditor() {

@@ -1,3 +1,9 @@
+## [0.9.7] — 2026-03-22
+
+### Added
+- **Wikilinks**: `[[note-name]]` or `[[note-name|display text]]` syntax in markdown files renders as a clickable link in Preview mode; clicking opens the target note (`.md` extension auto-appended if omitted); notes not found show a toast
+- **Scroll sync**: when split pane is open with the same file in source + preview, scrolling either panel proportionally scrolls the other
+
 ## [0.9.6] — 2026-03-22
 
 ### Fixed

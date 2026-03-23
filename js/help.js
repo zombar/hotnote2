@@ -83,6 +83,18 @@ console.log(x);
 \`\`\`
 ---
 \`\`\`
+
+## Wikilinks
+
+Link to another note in your folder by name:
+
+\`\`\`
+[[my-note]]
+[[my-note.md]]
+[[my-note|Custom display text]]
+\`\`\`
+
+Clicking a wikilink in Preview mode opens that note. If no extension is given, \`.md\` is tried automatically.
 `;
 
 const HELP_SHORTCUTS = `# Keyboard Shortcuts
