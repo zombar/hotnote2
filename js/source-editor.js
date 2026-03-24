@@ -912,7 +912,6 @@ class SourceEditor {
                 wantCol: lineLen
             }];
             this._updateOverlay();
-            window.getSelection()?.removeAllRanges();
             return;
         }
 
@@ -969,7 +968,6 @@ class SourceEditor {
             wantCol: end
         }];
         this._updateOverlay();
-        window.getSelection()?.removeAllRanges();
     }
 }
 
