@@ -93,6 +93,7 @@ function showToast(message, duration = 3000) {
 
 function startFileWatcher() {
     setInterval(async () => {
+        // --- Per-pane file change detection ---
         for (const paneId of ['pane1', 'pane2']) {
             const ps = getPaneState(paneId);
             if (!ps.currentFileHandle || ps.isDirty) continue;
@@ -107,11 +108,53 @@ function startFileWatcher() {
                     window.sourceEditors?.[paneId === 'pane2' ? 'pane2' : 'pane1']?.setValue(content, { silent: true });
                     switchToMode(ps.editorMode, paneId, content);
                     showToast(`Reloaded: ${ps.currentFilename}`);
-                    if (state._panesHaveSameFile) break;
+                    if (state._panesHaveSameFile) {
+                        // Push the already-read content into pane2 immediately (no second file read)
+                        const ps2 = getPaneState('pane2');
+                        ps2.lastModifiedTime = file.lastModified;
+                        const textarea2 = getPaneEl('source-editor', 'pane2');
+                        if (textarea2) textarea2.value = content;
+                        window.sourceEditors?.pane2?.setValue(content, { silent: true });
+                        switchToMode(ps2.editorMode, 'pane2', content);
+                        break;
+                    }
                 }
             } catch (_) {
                 // file deleted or permissions revoked — ignore silently
             }
+        }
+
+        // --- Directory scan: detect externally added/removed files ---
+        if (!state.rootHandle || state.searchActive) return;
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar || sidebar.classList.contains('collapsed')) return;
+        const now = performance.now();
+        if (now - state._lastDirScan < 5000) return;
+        state._lastDirScan = now;
+
+        const baseDirRelPath = state.pathStack.slice(1).map(p => p.name).join('/');
+        const dirsToScan = [
+            { handle: state.currentDirHandle, relPath: baseDirRelPath, ulEl: document.getElementById('file-list') },
+        ];
+        document.querySelectorAll('#file-list .file-entry.expanded').forEach(li => {
+            if (li._dirHandle) {
+                const childUl = li.querySelector('.folder-children');
+                if (childUl) dirsToScan.push({ handle: li._dirHandle, relPath: li._dirRelPath, ulEl: childUl });
+            }
+        });
+
+        for (const { handle, relPath, ulEl } of dirsToScan) {
+            if (!ulEl) continue;
+            try {
+                const entries = await listDirectory(handle);
+                const sig = entries.map(e => `${e.name}:${e.kind}`).join('|');
+                const sigKey = relPath || '';
+                const prevSig = state._dirSigs.get(sigKey);
+                if (prevSig !== undefined && prevSig !== sig) {
+                    _patchDirChildren(ulEl, entries, handle, relPath || '');
+                }
+                state._dirSigs.set(sigKey, sig);
+            } catch (_) { /* ignore — handle revoked or dir deleted */ }
         }
     }, 3000);
 }

@@ -1,3 +1,13 @@
+## [0.9.9] — 2026-03-24
+
+### Added
+- **Reveal file in sidebar**: opening a file via wikilink, history back/forward, or resume now automatically expands any collapsed parent folders and scrolls the file entry into view
+- **External file detection**: the file watcher now scans open directories every 5 s and non-destructively updates the sidebar when files are added or removed externally (preserves expanded folder state)
+
+### Fixed
+- **Split-pane same-file reload**: when both panes show the same file and an external change is detected, pane 2 was updated one watcher tick (3 s) late; the already-read content is now pushed to pane 2 immediately in the same tick
+- **Diff view stale after git status refresh**: if a file was committed or reverted externally, the diff view was not cleared until the user manually switched modes; panes in diff mode are now refreshed automatically after each git status cycle
+
 ## [0.9.8] — 2026-03-24
 
 ### Fixed

@@ -479,6 +479,14 @@ async function _refreshGitStatusImpl() {
     state.gitChangedDirs = _buildChangedDirs(state.gitChangedPaths);
     updateGitFilterBar();
     _reAnnotateSidebarDots();
+    // Refresh any pane currently showing a diff view so it reflects new git status
+    for (const paneId of ['pane1', 'pane2']) {
+        if (paneId === 'pane2' && (!state.splitMode || state.helpMode)) continue;
+        const ps = getPaneState(paneId);
+        if (ps.editorMode === 'diff' && ps.currentRelativePath) {
+            switchToMode('diff', paneId);
+        }
+    }
 }
 
 async function refreshGitStatus({ force = false } = {}) {

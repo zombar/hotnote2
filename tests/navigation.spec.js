@@ -61,3 +61,59 @@ test.describe('back/forward navigation', () => {
         await expect(page.locator('#source-editor')).toHaveValue(/# B/);
     });
 });
+
+// ── Reveal in sidebar ─────────────────────────────────────────────────────────
+
+test.describe('reveal in sidebar', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.addInitScript({ path: MOCK_SCRIPT });
+        await page.goto('/');
+    });
+
+    test('opening a nested file via wikilink expands parent folders', async ({ page }) => {
+        await openMockFolder(page, {
+            'index.md': '# Index\n\nSee [[guide]].',
+            'docs': { 'guide.md': '# Guide' },
+        });
+
+        // Click index.md to open it, switch to wysiwyg so the wikilink is rendered
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'index.md' }).click();
+        await expect(page.locator('#mode-toolbar')).toBeVisible();
+        await page.locator('#mode-wysiwyg').click();
+        await expect(page.locator('#wysiwyg')).toBeVisible();
+
+        // Verify docs folder is collapsed before clicking wikilink
+        await expect(page.locator('#file-list .file-entry.expanded')).toHaveCount(0);
+
+        // Click the wikilink — this calls openWikilink → openFile → revealInSidebar
+        await page.locator('#wysiwyg a.wikilink').click();
+        await expect(page.locator('#source-editor')).toHaveValue(/# Guide/);
+
+        // The docs folder should now be expanded in the sidebar
+        await expect(page.locator('#file-list .file-entry.expanded')).toHaveCount(1);
+
+        // guide.md should be the active entry
+        const activeEntry = page.locator('#file-list .file-entry.active');
+        await expect(activeEntry).toBeVisible();
+        await expect(activeEntry).toContainText('guide.md');
+    });
+
+    test('opening a deeply nested file reveals all ancestor folders', async ({ page }) => {
+        await openMockFolder(page, {
+            'index.md': '# Index\n\nSee [[deep]].',
+            'docs': { 'api': { 'deep.md': '# Deep' } },
+        });
+
+        // Open index and follow wikilink to the deeply nested file
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'index.md' }).click();
+        await expect(page.locator('#mode-toolbar')).toBeVisible();
+        await page.locator('#mode-wysiwyg').click();
+        await page.locator('#wysiwyg a.wikilink').click();
+        await expect(page.locator('#source-editor')).toHaveValue(/# Deep/);
+
+        // Both docs and docs/api should be expanded
+        await expect(page.locator('#file-list .file-entry.expanded')).toHaveCount(2);
+        const activeEntry = page.locator('#file-list .file-entry.active');
+        await expect(activeEntry).toContainText('deep.md');
+    });
+});

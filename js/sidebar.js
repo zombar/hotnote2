@@ -333,6 +333,99 @@ function getFileIconSvg(name, kind) {
 }
 
 // =========================================================================
+// Reveal file in sidebar (expand parents + scroll to entry)
+// =========================================================================
+
+async function revealInSidebar(relPath) {
+    if (!relPath) return;
+    const baseDirRelPath = state.pathStack.slice(1).map(p => p.name).join('/');
+
+    // Only reveal if the file is under the currently displayed root
+    if (baseDirRelPath && !relPath.startsWith(baseDirRelPath + '/')) return;
+
+    const segments = relPath.split('/');
+
+    // Expand each parent directory segment (skip the filename itself)
+    for (let i = 1; i < segments.length; i++) {
+        const dirPath = segments.slice(0, i).join('/');
+        if (baseDirRelPath && dirPath === baseDirRelPath) continue; // already the root
+
+        let folderLi = null;
+        document.querySelectorAll('#file-list .file-entry').forEach(li => {
+            if (li._dirRelPath === dirPath) folderLi = li;
+        });
+        if (!folderLi) return; // not in DOM — cannot expand
+        if (!folderLi.classList.contains('expanded')) {
+            await toggleFolder(folderLi, folderLi._dirHandle, dirPath);
+        }
+    }
+
+    // Scroll the file entry into view
+    document.querySelectorAll('#file-list .file-entry').forEach(li => {
+        if (li._relPath === relPath && !li._dirHandle) {
+            li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    });
+}
+
+// =========================================================================
+// Patch directory children (non-destructive add/remove for file watcher)
+// =========================================================================
+
+function _patchDirChildren(ulEl, freshEntries, parentHandle, baseDirRelPath) {
+    // Build a set of full relPaths for fresh entries
+    const freshPaths = new Set(freshEntries.map(e =>
+        baseDirRelPath ? baseDirRelPath + '/' + e.name : e.name
+    ));
+
+    // Remove li elements whose relPath is no longer present
+    [...ulEl.querySelectorAll(':scope > li.file-entry')].forEach(li => {
+        if (li._relPath && !freshPaths.has(li._relPath)) li.remove();
+    });
+
+    // Build set of paths currently in DOM
+    const existingPaths = new Set();
+    ulEl.querySelectorAll(':scope > li.file-entry').forEach(li => {
+        if (li._relPath) existingPaths.add(li._relPath);
+    });
+
+    // Add new entries that are not yet in the DOM
+    for (const entry of freshEntries) {
+        const entryRelPath = baseDirRelPath ? baseDirRelPath + '/' + entry.name : entry.name;
+        if (existingPaths.has(entryRelPath)) continue;
+
+        const newLi = renderFileEntry(entry, parentHandle, baseDirRelPath);
+        const existingItems = [...ulEl.querySelectorAll(':scope > li.file-entry')];
+        const newIsDir = entry.kind === 'directory';
+        let inserted = false;
+        for (const existing of existingItems) {
+            const existingIsDir = !!existing._dirHandle;
+            const existingName = (existing._relPath || '').split('/').pop();
+            if (newIsDir && !existingIsDir) {
+                ulEl.insertBefore(newLi, existing); inserted = true; break;
+            }
+            if (newIsDir === existingIsDir && entry.name.localeCompare(existingName) < 0) {
+                ulEl.insertBefore(newLi, existing); inserted = true; break;
+            }
+        }
+        if (!inserted) ulEl.appendChild(newLi);
+    }
+
+    // Sync empty placeholder
+    const hasRealEntries = ulEl.querySelectorAll(':scope > li.file-entry').length > 0;
+    const emptyPlaceholder = ulEl.querySelector(':scope > .folder-empty-placeholder');
+    if (!hasRealEntries && !emptyPlaceholder) {
+        const emptyLi = document.createElement('li');
+        emptyLi.className = 'folder-empty-placeholder';
+        emptyLi.style.cssText = 'color:var(--color-text-tertiary);padding:0.2rem 0.75rem;font-size:0.75rem;font-style:italic';
+        emptyLi.textContent = 'Empty folder';
+        ulEl.appendChild(emptyLi);
+    } else if (hasRealEntries && emptyPlaceholder) {
+        emptyPlaceholder.remove();
+    }
+}
+
+// =========================================================================
 // Smart Target Folder
 // =========================================================================
 
