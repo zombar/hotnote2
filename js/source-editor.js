@@ -58,6 +58,7 @@ class SourceEditor {
         this.ceEl.addEventListener('beforeinput',      (e) => this._onBeforeInput(e));
         this.ceEl.addEventListener('keydown',           (e) => this._onKeyDown(e));
         this.ceEl.addEventListener('mousedown',         (e) => this._onMouseDown(e));
+        this.ceEl.addEventListener('dblclick',          (e) => this._onDblClick(e));
         this.ceEl.addEventListener('scroll',            ()  => { this._updateOverlay(); this._syncLineNumScroll(); });
         this.ceEl.addEventListener('compositionstart',  ()  => { this._isComposing = true; });
         this.ceEl.addEventListener('compositionend',    (e) => {
@@ -937,6 +938,23 @@ class SourceEditor {
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
+        this._updateOverlay();
+    }
+
+    _onDblClick(e) {
+        const pos = this._pointToPos(e.clientX, e.clientY);
+        if (!pos) return;
+        const line = this._lines[pos.line] || '';
+        let start = pos.col;
+        let end = pos.col;
+        while (start > 0 && /\w/.test(line[start - 1])) start--;
+        while (end < line.length && /\w/.test(line[end])) end++;
+        if (start === end && end < line.length) end++;
+        this._cursors = [{
+            line: pos.line, col: end,
+            selLine: pos.line, selCol: start,
+            wantCol: end
+        }];
         this._updateOverlay();
     }
 }
