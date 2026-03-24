@@ -119,6 +119,32 @@
         touchFile(relPath) {
             _lastModified.set(relPath, Date.now());
         },
+        // Mutate the live tree in place so open directory handles pick up the change
+        addFile(relPath, content) {
+            const parts = relPath.split('/');
+            const filename = parts.pop();
+            let node = _tree;
+            for (const part of parts) {
+                if (!node[part] || typeof node[part] !== 'object') node[part] = {};
+                node = node[part];
+            }
+            node[filename] = content || '';
+        },
+        removeFile(relPath) {
+            const parts = relPath.split('/');
+            const filename = parts.pop();
+            let node = _tree;
+            for (const part of parts) {
+                if (!node[part]) return;
+                node = node[part];
+            }
+            delete node[filename];
+        },
+        // Update content of an already-open file so the watcher picks up the change
+        setFileContent(relPath, content) {
+            _written.set(relPath, content);
+            _lastModified.set(relPath, Date.now());
+        },
         get written() {
             const o = {};
             _written.forEach((v, k) => { o[k] = v; });

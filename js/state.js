@@ -97,6 +97,9 @@ const state = {
     gitMtimeCache: new Map(),    // relPath → lastModified — fast-path to skip SHA-1
     gitLastRefreshed: 0,         // performance.now() of last completed refresh
     _gitRefreshTimer: null,      // setTimeout handle for debounced post-save refresh
+    // Directory watcher state
+    _dirSigs: new Map(),    // dirRelPath → signature string (sorted name:kind pairs)
+    _lastDirScan: 0,        // performance.now() of last directory scan
     // Split pane state
     splitMode: false,
     helpMode: false,

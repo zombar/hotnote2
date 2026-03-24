@@ -61,6 +61,7 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
         document.querySelectorAll('.file-entry').forEach(li => {
             li.classList.toggle('active', !!li._relPath && li._relPath === state.currentRelativePath);
         });
+        revealInSidebar(state.currentRelativePath); // fire-and-forget; expands parents + scrolls
     }
 
     // Restore cached positions if this file was visited before
@@ -508,6 +509,8 @@ async function openWikilink(target, paneId = 'pane1') {
             match = allFiles.find(f => f.name === name + '.md' || f.relPath === name + '.md');
         }
         if (match) {
+            if (paneId === 'pane1') state.currentRelativePath = match.relPath;
+            else getPaneState(paneId).currentRelativePath = match.relPath;
             await openFile(match.handle, match.name, true, paneId);
             const ps = getPaneState(paneId);
             if (ps.editorMode !== 'wysiwyg' && getExtension(match.name) === 'md') {
