@@ -753,6 +753,14 @@ a.wikilink:hover {
     font-size: inherit;
 }
 
+/* Hide native browser selection in the CE editor — our overlay renders it instead.
+   Using ::selection rather than removeAllRanges() preserves the editing context
+   so beforeinput events keep firing. */
+#source-editor-ce::selection, #source-editor-ce *::selection,
+#source-editor-ce-p2::selection, #source-editor-ce-p2 *::selection {
+    background: transparent;
+}
+
 /* Cursor / selection overlay */
 #source-editor-overlay, #source-editor-overlay-p2 {
     position: absolute;

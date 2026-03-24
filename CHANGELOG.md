@@ -1,3 +1,10 @@
+## [0.9.8] — 2026-03-24
+
+### Fixed
+- **Double-click word selection**: double-clicking a word in the source editor now correctly sets the custom cursor selection to the word boundaries; previously the browser's native selection was not reflected in the cursor model, so typing or Backspace would not replace the selected text
+- **Triple-click line selection**: triple-clicking now selects the entire line in the custom cursor model, so typing or Backspace replaces the whole line
+- **Double/triple-click selection rendering**: Chrome ignores `user-select:none` on `contenteditable` elements, causing the browser's native word/line highlight to render on top of the custom overlay; `getSelection().removeAllRanges()` is now called after each multi-click handler to remove the conflicting native highlight
+
 ## [0.9.7] — 2026-03-22
 
 ### Added

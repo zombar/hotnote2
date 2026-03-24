@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.9.7';
+const APP_VERSION = '0.9.8';
 
 // =========================================================================
 // File Opening & Editor

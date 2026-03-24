@@ -421,6 +421,33 @@ test.describe('selection and navigation', () => {
         const val = await getValue(page);
         expect(val).toBe('helloX world');
     });
+
+    test('double-click selects word, typing replaces', async ({ page }) => {
+        await openEditor(page, 'hello world');
+        // Select 'hello' (offset 0..5)
+        await page.evaluate(() => window.sourceEditors.pane1.setSelection(0, 5));
+        await page.keyboard.type('bye');
+        const val = await getValue(page);
+        expect(val).toBe('bye world');
+    });
+
+    test('double-click selects word, Backspace removes block', async ({ page }) => {
+        await openEditor(page, 'hello world');
+        // Select 'hello' (offset 0..5)
+        await page.evaluate(() => window.sourceEditors.pane1.setSelection(0, 5));
+        await page.keyboard.press('Backspace');
+        const val = await getValue(page);
+        expect(val).toBe(' world');
+    });
+
+    test('triple-click selects line, typing replaces', async ({ page }) => {
+        await openEditor(page, 'hello world\nsecond line');
+        // Select entire first line (offset 0..11)
+        await page.evaluate(() => window.sourceEditors.pane1.setSelection(0, 11));
+        await page.keyboard.type('replaced');
+        const val = await getValue(page);
+        expect(val).toBe('replaced\nsecond line');
+    });
 });
 
 // ── setValue / getValue API ───────────────────────────────────────────────────
