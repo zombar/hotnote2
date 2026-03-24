@@ -903,6 +903,18 @@ class SourceEditor {
         const pos = this._pointToPos(e.clientX, e.clientY);
         if (!pos) return;
 
+        if (e.detail >= 3) {
+            e.preventDefault();
+            const lineLen = (this._lines[pos.line] || '').length;
+            this._cursors = [{
+                line: pos.line, col: lineLen,
+                selLine: pos.line, selCol: 0,
+                wantCol: lineLen
+            }];
+            this._updateOverlay();
+            return;
+        }
+
         if (e.altKey) {
             e.preventDefault();
             this._cursors.push(this._mkCursor(pos.line, pos.col));

@@ -2,6 +2,7 @@
 
 ### Fixed
 - **Double-click word selection**: double-clicking a word in the source editor now correctly sets the custom cursor selection to the word boundaries; previously the browser's native selection was not reflected in the cursor model, so typing or Backspace would not replace the selected text
+- **Triple-click line selection**: triple-clicking now selects the entire line in the custom cursor model, so typing or Backspace replaces the whole line
 
 ## [0.9.7] — 2026-03-22
 
