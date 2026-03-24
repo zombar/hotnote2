@@ -1,3 +1,8 @@
+## [0.9.8] — 2026-03-24
+
+### Fixed
+- **Double-click word selection**: double-clicking a word in the source editor now correctly sets the custom cursor selection to the word boundaries; previously the browser's native selection was not reflected in the cursor model, so typing or Backspace would not replace the selected text
+
 ## [0.9.7] — 2026-03-22
 
 ### Added
