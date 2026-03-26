@@ -2,6 +2,10 @@
 
 ### Added
 - **Show hidden files in sidebar**: files and folders whose names begin with `.` (e.g. `.gitignore`, `.env`) are now visible in the sidebar and can be opened and edited like any other file
+- **Per-file undo/redo history**: the source editor now saves and restores each file's undo/redo stacks when switching files, so Ctrl+Z in file A only undoes edits made in file A; history is preserved across back/forward navigation as well
+
+### Fixed
+- **Undo bleed across file switches**: switching from file A to file B and pressing Ctrl+Z could restore file A's content into file B; stacks are now cleared on load and separately cached per file
 
 ## [0.9.9] — 2026-03-24
 
