@@ -97,6 +97,10 @@ class SourceEditor {
     setValue(text, options = {}) {
         this._lines   = text === '' ? [''] : text.split('\n');
         this._cursors = [this._mkCursor(0, 0)];
+        clearTimeout(this._undoTimer);
+        this._undoTimer = null;
+        this._undoStack = [];
+        this._redoStack = [];
         this._render();
         if (options.silent) {
             this.mirrorEl.value = text;

@@ -213,6 +213,53 @@ test.describe('undo and redo', () => {
         const val = await getValue(page);
         expect(val).toBe('a');
     });
+
+    test('undo after switching files does not bleed content from previous file', async ({ page }) => {
+        // Set up two files
+        await page.evaluate(() => window.__mockFS.setTree(
+            { 'a.md': 'file A content', 'b.md': 'file B content' }, 'my-notes'));
+        await page.locator('#open-folder').click();
+        await page.locator('#file-list li').first().waitFor({ state: 'visible' });
+
+        // Open a.md and make an edit
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'a.md' }).click();
+        await page.locator('#mode-toolbar').waitFor({ state: 'visible' });
+        await page.locator('#source-editor-ce').click();
+        await page.keyboard.press('End');
+        await page.keyboard.type(' EDITED');
+
+        // Switch to b.md — accept the "discard changes" dialog and wait for content
+        page.once('dialog', d => d.accept());
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'b.md' }).click();
+        await expect(page.locator('#source-editor')).toHaveValue('file B content');
+        await page.locator('#source-editor-ce').click();
+
+        // Undo in b.md — must not restore a.md's content
+        await page.keyboard.press('Control+z');
+        const val = await getValue(page);
+        expect(val).toBe('file B content');
+    });
+
+    test('undo history is empty after opening a new file', async ({ page }) => {
+        await page.evaluate(() => window.__mockFS.setTree(
+            { 'a.md': 'file A', 'b.md': 'file B' }, 'my-notes'));
+        await page.locator('#open-folder').click();
+        await page.locator('#file-list li').first().waitFor({ state: 'visible' });
+
+        // Open a.md, type something so the stack is non-empty
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'a.md' }).click();
+        await page.locator('#mode-toolbar').waitFor({ state: 'visible' });
+        await page.locator('#source-editor-ce').click();
+        await page.keyboard.type('extra');
+
+        // Open b.md — accept discard dialog, wait for content, undo stack should be cleared
+        page.once('dialog', d => d.accept());
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'b.md' }).click();
+        await expect(page.locator('#source-editor')).toHaveValue('file B');
+
+        const stackSize = await page.evaluate(() => window.sourceEditors.pane1._undoStack.length);
+        expect(stackSize).toBe(0);
+    });
 });
 
 // ── Line operations ───────────────────────────────────────────────────────────
