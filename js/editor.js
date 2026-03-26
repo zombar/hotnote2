@@ -30,6 +30,11 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
                     },
                 };
                 const _cacheKeyPos = current.relPath || current.name;
+                const _engSave = window.sourceEditors?.[paneId === 'pane2' ? 'pane2' : 'pane1'];
+                if (_engSave) {
+                    current.pos.undoStack = _engSave._undoStack.slice();
+                    current.pos.redoStack = _engSave._redoStack.slice();
+                }
                 if (ps.filePositionCache.size >= FILE_POS_CACHE_MAX) {
                     ps.filePositionCache.delete(ps.filePositionCache.keys().next().value);
                 }
@@ -98,6 +103,13 @@ async function openFile(fileHandle, filename, pushHistory = true, paneId = 'pane
 
     determineInitialMode(ext, content, ps);
     renderEditor(content, filename, paneId);
+
+    // Restore undo/redo stacks for previously-visited file
+    const _engRestore = window.sourceEditors?.[paneId === 'pane2' ? 'pane2' : 'pane1'];
+    if (_engRestore && _cachedPos?.undoStack) {
+        _engRestore._undoStack = _cachedPos.undoStack;
+        _engRestore._redoStack = _cachedPos.redoStack || [];
+    }
 
     // Restore cursor for previously-visited file (pane1 only for URL tracking)
     if (paneId === 'pane1' && _cachedPos && _cachedPos.cursorStart !== undefined) {
@@ -171,6 +183,11 @@ async function navigateHistory(delta) {
             },
         };
         const _navCacheKey = curEntry.relPath || curEntry.name;
+        const _engNav = window.sourceEditors?.[paneId === 'pane2' ? 'pane2' : 'pane1'];
+        if (_engNav) {
+            curEntry.pos.undoStack = _engNav._undoStack.slice();
+            curEntry.pos.redoStack = _engNav._redoStack.slice();
+        }
         if (ps.filePositionCache.size >= FILE_POS_CACHE_MAX) {
             ps.filePositionCache.delete(ps.filePositionCache.keys().next().value);
         }
@@ -182,6 +199,13 @@ async function navigateHistory(delta) {
     if (paneId === 'pane1') state.currentRelativePath = relPath || null;
     else ps.currentRelativePath = relPath || null;
     await openFile(handle, name, false, paneId);
+
+    // Restore undo/redo stacks for the target file
+    const _engNavRestore = window.sourceEditors?.[paneId === 'pane2' ? 'pane2' : 'pane1'];
+    if (_engNavRestore && pos?.undoStack) {
+        _engNavRestore._undoStack = pos.undoStack;
+        _engNavRestore._redoStack = pos.redoStack || [];
+    }
 
     // Restore mode, cursor, and scroll for the target file
     if (pos) {

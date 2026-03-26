@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.splitMode && state._panesHaveSameFile && !state.helpMode) {
             const textarea2 = document.getElementById('source-editor-p2');
             if (textarea2) textarea2.value = sourceEditor.value;
-            window.sourceEditors.pane2?.setValue(sourceEditor.value, { silent: true });
+            window.sourceEditors.pane2?.setValue(sourceEditor.value, { silent: true, keepHistory: true });
             updateSourceHighlight('pane2');
             debouncedSyncPreview('pane2');
         }
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.splitMode && state._panesHaveSameFile && !state.helpMode) {
             const textarea1 = document.getElementById('source-editor');
             if (textarea1) textarea1.value = sourceEditor2.value;
-            window.sourceEditors.pane1?.setValue(sourceEditor2.value, { silent: true });
+            window.sourceEditors.pane1?.setValue(sourceEditor2.value, { silent: true, keepHistory: true });
             updateSourceHighlight('pane1');
             debouncedSyncPreview('pane1');
         }
