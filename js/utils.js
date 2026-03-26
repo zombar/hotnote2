@@ -60,7 +60,6 @@ async function listDirectory(dirHandle) {
     const dirs = [];
     const fileHandles = [];
     for await (const [name, handle] of dirHandle.entries()) {
-        if (name.startsWith('.')) continue; // skip hidden
         if (handle.kind === 'directory') {
             dirs.push({ name, handle, kind: 'directory' });
         } else {
@@ -83,7 +82,6 @@ async function listDirectory(dirHandle) {
 async function getAllFiles(dirHandle, basePath, results = [], limit = MAX_SEARCH_FILES) {
     for await (const [name, handle] of dirHandle.entries()) {
         if (results.length >= limit) return results;
-        if (name.startsWith('.')) continue;
         const relPath = basePath ? basePath + '/' + name : name;
         if (handle.kind === 'directory') {
             await getAllFiles(handle, relPath, results, limit);
