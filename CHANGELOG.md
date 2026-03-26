@@ -1,3 +1,8 @@
+## [1.0.0] — 2026-03-26
+
+### Added
+- **Show hidden files in sidebar**: files and folders whose names begin with `.` (e.g. `.gitignore`, `.env`) are now visible in the sidebar and can be opened and edited like any other file
+
 ## [0.9.9] — 2026-03-24
 
 ### Added
