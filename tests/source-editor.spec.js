@@ -260,6 +260,39 @@ test.describe('undo and redo', () => {
         const stackSize = await page.evaluate(() => window.sourceEditors.pane1._undoStack.length);
         expect(stackSize).toBe(0);
     });
+
+    test('undo history is preserved when navigating back to a previously-edited file', async ({ page }) => {
+        await page.evaluate(() => window.__mockFS.setTree(
+            { 'a.md': 'file A', 'b.md': 'file B' }, 'my-notes'));
+        await page.locator('#open-folder').click();
+        await page.locator('#file-list li').first().waitFor({ state: 'visible' });
+
+        // Open a.md and type something (builds undo stack)
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'a.md' }).click();
+        await page.locator('#mode-toolbar').waitFor({ state: 'visible' });
+        await page.locator('#source-editor-ce').click();
+        await page.keyboard.press('End');
+        await page.keyboard.type(' EDIT');
+        // Wait for undo batch debounce
+        await page.waitForTimeout(600);
+
+        // Save so no discard dialog on switch
+        await page.keyboard.press('Control+s');
+
+        // Switch to b.md
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'b.md' }).click();
+        await expect(page.locator('#source-editor')).toHaveValue('file B');
+
+        // Switch back to a.md — file on disk is 'file A EDIT'
+        await page.locator('#file-list li.file-entry .file-entry-row', { hasText: 'a.md' }).click();
+        await expect(page.locator('#source-editor')).toHaveValue('file A EDIT');
+
+        // Undo should remove the ' EDIT' we typed
+        await page.locator('#source-editor-ce').click();
+        await page.keyboard.press('Control+z');
+        const val = await getValue(page);
+        expect(val).toBe('file A');
+    });
 });
 
 // ── Line operations ───────────────────────────────────────────────────────────
